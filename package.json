@@ -1,0 +1,24 @@
+{
+  "name": "drawing-maker",
+  "version": "1.0.0",
+  "description": "Generative G-Code Generator",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "ts-node src/main.ts",
+    "dev": "nodemon --watch src src/main.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "canvas-sketch-util": "^1.10.0",
+    "makerjs": "^0.17.0",
+    "simplex-noise": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

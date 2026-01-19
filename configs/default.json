@@ -1,0 +1,24 @@
+{
+    "sketch": "terrain-moire",
+    "outputBaseName": "drawing",
+    "canvas": {
+        "width": 200,
+        "height": 300,
+        "margin": [
+            15,
+            10
+        ]
+    },
+    "gcode": {
+        "feedRate": 2000,
+        "zUp": 5,
+        "zDown": 0
+    },
+    "params": {
+        "lines": 120,
+        "rotation": 1.0,
+        "noiseScale": 0.1,
+        "noiseMagnitude": 3,
+        "resampleRes": 1.0
+    }
+}
