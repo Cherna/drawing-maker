@@ -7,9 +7,17 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "outDir": "./dist",
-        "rootDir": "./src"
+        "rootDir": "./src",
+        "resolveJsonModule": true,
+        "moduleResolution": "node",
+        "types": ["node"]
     },
     "include": [
         "src/**/*"
-    ]
+    ],
+    "ts-node": {
+        "esm": false,
+        "experimentalSpecifierResolution": "node",
+        "transpileOnly": false
+    }
 }

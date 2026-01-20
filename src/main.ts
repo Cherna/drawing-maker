@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import MakerJs from 'makerjs';
 import { GCodeExporter } from './core/gcode-exporter';
+import { modelToSVG } from './core/svg-exporter';
 import { AppConfig, SketchGenerator } from './types';
-import { TerrainMoireSketch } from './sketches/terrain-moire';
 import { PipelineSketch } from './sketches/pipeline-sketch';
 
 // --- CONFIG LOADING ---
@@ -22,7 +22,6 @@ function loadConfig(configPath: string): AppConfig {
 
 // --- SKETCH REGISTRY ---
 const SKETCHES: Record<string, SketchGenerator> = {
-    'terrain-moire': new TerrainMoireSketch(),
     'pipeline': new PipelineSketch()
 };
 
@@ -82,10 +81,8 @@ async function main() {
         const svgFilename = gcodeFilename.replace('.gcode', '.svg');
         const svgPath = path.join(outputDir, svgFilename);
 
-        const svg = MakerJs.exporter.toSVG(model, {
-            units: MakerJs.unitType.Millimeter,
-            useSvgPathOnly: false
-        });
+        // Use custom SVG exporter that preserves coordinates
+        const svg = modelToSVG(model, config.canvas);
         fs.writeFileSync(svgPath, svg);
         console.log(`Saved SVG to: ${svgPath}`);
 

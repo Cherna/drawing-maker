@@ -1,13 +1,11 @@
 import MakerJs from 'makerjs';
+import { GCodeConfig } from '../types';
 
-export interface GCodeConfig {
-    feedRate: number;
-    zUp: number;
-    zDown: number;
+interface InternalGCodeConfig extends GCodeConfig {
     precision: number;
 }
 
-const DEFAULT_CONFIG: GCodeConfig = {
+const DEFAULT_CONFIG: InternalGCodeConfig = {
     feedRate: 1500,
     zUp: 0,     // e.g. Servo Angle
     zDown: 45,  // e.g. Servo Angle
@@ -15,7 +13,7 @@ const DEFAULT_CONFIG: GCodeConfig = {
 };
 
 export class GCodeExporter {
-    static export(model: MakerJs.IModel, config: Partial<GCodeConfig> = {}): string {
+    static export(model: MakerJs.IModel, config: Partial<InternalGCodeConfig> = {}): string {
         const cfg = { ...DEFAULT_CONFIG, ...config };
         const lines: string[] = [];
 

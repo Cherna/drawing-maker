@@ -9,30 +9,42 @@ export interface CanvasConfig {
     margin: MarginConfig;
 }
 
+// Mask types - geometric and procedural
+export type MaskType = 
+    | 'radial'      // Circular gradient
+    | 'linear'      // Linear gradient
+    | 'border'      // Edge feathering
+    | 'noise'       // Simplex noise
+    | 'turbulence'  // Multi-octave fractal noise
+    | 'cells'       // Voronoi/cellular pattern
+    | 'waves'       // Sine wave pattern
+    | 'checker';    // Checkerboard pattern
+
+// Mask combination operations
+export type MaskOp = 'multiply' | 'add' | 'subtract' | 'max' | 'min' | 'screen';
+
 export interface MaskConfig {
-    type: 'radial' | 'linear' | 'noise';
+    type: MaskType;
     params: any;
     invert?: boolean;
-}
-
-export interface EffectConfig {
-    type: string; // e.g. 'noise', 'sinewave'
-    params: any;
-    mask?: MaskConfig;
+    // Post-processing
+    threshold?: number;      // Convert to hard edge at this value (0-1)
+    remap?: [number, number]; // Remap output range [min, max]
+    // Combining masks
+    op?: MaskOp;             // How to combine with previous mask (default: multiply)
 }
 
 // Pipeline Types
-export type ToolType = 'generator' | 'modifier' | 'transform';
 
 export interface PipelineStep {
     tool: string; // "stripes", "noise", "rotate"
-    type?: ToolType; // Optional if tool name is unique or inferred
     params: any;
     mask?: MaskConfig | MaskConfig[]; // Only applies to modifiers
 }
 
 export interface PipelineParams {
     steps: PipelineStep[];
+    seed?: number; // Global seed for reproducibility
 }
 
 export interface GCodeConfig {

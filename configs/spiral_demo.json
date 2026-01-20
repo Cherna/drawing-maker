@@ -1,0 +1,43 @@
+{
+    "sketch": "pipeline",
+    "outputBaseName": "spiral_demo",
+    "canvas": {
+        "width": 200,
+        "height": 200,
+        "margin": 15
+    },
+    "gcode": {
+        "feedRate": 2000,
+        "zUp": 5,
+        "zDown": 0
+    },
+    "params": {
+        "seed": 123,
+        "steps": [
+            {
+                "tool": "spiral",
+                "params": {
+                    "turns": 25,
+                    "pointsPerTurn": 60
+                }
+            },
+            {
+                "tool": "noise",
+                "params": {
+                    "scale": 0.1,
+                    "magnitude": 3,
+                    "seed": 123
+                },
+                "mask": {
+                    "type": "radial",
+                    "params": {
+                        "center": [0.5, 0.5],
+                        "radius": 0.8,
+                        "falloff": "smooth"
+                    },
+                    "invert": true
+                }
+            }
+        ]
+    }
+}

@@ -1,6 +1,6 @@
 {
     "sketch": "pipeline",
-    "outputBaseName": "drawing",
+    "outputBaseName": "noise_mask_demo",
     "canvas": {
         "width": 200,
         "height": 300,
@@ -12,37 +12,42 @@
         "zDown": 0
     },
     "params": {
+        "seed": 42,
         "steps": [
             {
                 "tool": "stripes",
                 "params": {
-                    "lines": 100
+                    "lines": 150
                 }
             },
             {
                 "tool": "resample",
                 "params": {
-                    "res": 1.0
+                    "res": 0.5
                 }
             },
             {
                 "tool": "noise",
                 "params": {
                     "scale": 0.08,
-                    "magnitude": 4
+                    "magnitude": 8,
+                    "seed": 42
                 }
             },
             {
-                "tool": "clone",
+                "tool": "trim",
                 "params": {
-                    "steps": [
-                        {
-                            "tool": "rotate",
-                            "params": {
-                                "rotation": 2
-                            }
-                        }
-                    ]
+                    "seed": 42
+                },
+                "mask": {
+                    "type": "turbulence",
+                    "params": {
+                        "scale": 0.03,
+                        "octaves": 4,
+                        "contrast": 1.5,
+                        "seed": 42
+                    },
+                    "threshold": 0.5
                 }
             }
         ]
