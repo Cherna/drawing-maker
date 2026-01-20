@@ -86,7 +86,32 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     category: 'modifier',
     label: 'Resample',
     params: [
-      { key: 'res', label: 'Resolution', type: 'number', min: 0.1, max: 10, step: 0.1, default: 1.0 },
+      { key: 'detail', label: 'Detail', type: 'number', min: 0.1, max: 20, step: 0.1, default: 1.0 },
+    ],
+  },
+  'move': {
+    category: 'modifier',
+    label: 'Move',
+    params: [
+      { key: 'x', label: 'X (mm)', type: 'number', min: -500, max: 500, step: 1, default: 0 },
+      { key: 'y', label: 'Y (mm)', type: 'number', min: -500, max: 500, step: 1, default: 0 },
+    ],
+  },
+  'mirror': {
+    category: 'modifier',
+    label: 'Mirror',
+    params: [
+      { key: 'axis', label: 'Axis', type: 'select', options: ['x', 'y'], default: 'x' },
+      { key: 'center', label: 'From Center', type: 'boolean', default: true },
+    ],
+  },
+  'array': {
+    category: 'modifier',
+    label: 'Array',
+    params: [
+      { key: 'count', label: 'Count', type: 'number', min: 1, max: 50, step: 1, default: 2 },
+      { key: 'x', label: 'O. Set X', type: 'number', min: -200, max: 200, step: 1, default: 10 },
+      { key: 'y', label: 'O. Set Y', type: 'number', min: -200, max: 200, step: 1, default: 0 },
     ],
   },
   'noise': {
@@ -98,6 +123,8 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'magnitude', label: 'Magnitude', type: 'number', min: 0, max: 50, step: 0.1, default: 5 },
       { key: 'axis', label: 'Axis', type: 'select', options: ['both', 'x', 'y'], default: 'both' },
       { key: 'octaves', label: 'Octaves', type: 'number', min: 1, max: 8, step: 1, default: 1 },
+      { key: 'persistence', label: 'Persistence', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5 },
+      { key: 'lacunarity', label: 'Lacunarity', type: 'number', min: 1, max: 4, step: 0.1, default: 2 },
       { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 99999, step: 1 },
     ],
   },

@@ -8,16 +8,20 @@ interface SVGCanvasProps {
 
 export default function SVGCanvas({ svg }: SVGCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
+  const MIN_ZOOM = 0.1;
+  const MAX_ZOOM = 20; // Increased from 5 to allow up to 2000% zoom
+
   // Extract viewBox dimensions (the logical coordinate space)
   const viewBoxDims = useMemo(() => {
     if (!svg) return null;
-    
+
     const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/);
     if (viewBoxMatch) {
       const parts = viewBoxMatch[1].trim().split(/[\s,]+/).filter(p => p.length > 0);
@@ -36,12 +40,12 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
   // This ensures the SVG renders at a predictable pixel size
   const normalizedSvg = useMemo(() => {
     if (!svg || !viewBoxDims) return svg;
-    
+
     // Replace width="Xmm" with width="Xpx" (using viewBox dimensions as pixel size)
     let result = svg
       .replace(/width=["'][^"']+mm["']/, `width="${viewBoxDims.width}"`)
       .replace(/height=["'][^"']+mm["']/, `height="${viewBoxDims.height}"`);
-    
+
     return result;
   }, [svg, viewBoxDims]);
 
@@ -85,43 +89,90 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
     setOffset({ x: 0, y: 0 });
   }, [svg, containerSize, viewBoxDims]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = -e.deltaY * 0.001;
-    const newScale = Math.max(0.1, Math.min(5, scale + delta));
-    setScale(newScale);
-  }, [scale]);
+  // Use refs for high-frequency updates to avoid re-renders
+  const transformRef = useRef({ scale: 1, x: 0, y: 0 });
+
+  // Sync refs with state when state changes (e.g. via buttons)
+  useEffect(() => {
+    transformRef.current = { scale, x: offset.x, y: offset.y };
+  }, [scale, offset]);
+
+  // Update DOM directly
+  const updateTransform = () => {
+    if (!contentRef.current) return;
+    const { scale, x, y } = transformRef.current;
+    contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+  };
+
+  // Attach non-passive wheel listener
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = -e.deltaY * 0.001;
+
+      const prevScale = transformRef.current.scale;
+      const newScale = Math.max(0.1, Math.min(20, prevScale + delta));
+
+      transformRef.current.scale = newScale;
+      updateTransform();
+
+      // Throttle state update for UI
+      if (requestAnimationFrameRef.current) return;
+      requestAnimationFrameRef.current = requestAnimationFrame(() => {
+        setScale(newScale); // Sync React state for UI numbers
+        requestAnimationFrameRef.current = null;
+      });
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Refs for tracking animation frame
+  const requestAnimationFrameRef = useRef<number | null>(null);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 0 && !(e.target as HTMLElement).closest('button')) {
       setIsPanning(true);
-      setPanStart({ 
-        x: e.clientX - offset.x, 
-        y: e.clientY - offset.y 
+      setPanStart({
+        x: e.clientX - transformRef.current.x,
+        y: e.clientY - transformRef.current.y
       });
       e.preventDefault();
     }
-  }, [offset]);
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
-      setOffset({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
+      const newX = e.clientX - panStart.x;
+      const newY = e.clientY - panStart.y;
+
+      transformRef.current.x = newX;
+      transformRef.current.y = newY;
+      updateTransform();
+
+      // We don't necessarily need to update React state for every mouse move frame if we don't use it elsewhere
+      // But we do need it for the 'isPanning' logic consistency if we pause
     }
   }, [isPanning, panStart]);
 
   const handleMouseUp = useCallback(() => {
-    setIsPanning(false);
-  }, []);
+    if (isPanning) {
+      setIsPanning(false);
+      // Sync final state
+      setOffset({ x: transformRef.current.x, y: transformRef.current.y });
+    }
+  }, [isPanning]);
 
   const handleZoomIn = () => {
-    setScale(prev => Math.min(5, prev * 1.2));
+    setScale(prev => Math.min(MAX_ZOOM, prev * 1.2));
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(0.1, prev / 1.2));
+    setScale(prev => Math.max(MIN_ZOOM, prev / 1.2));
   };
 
   const handleReset = () => {
@@ -182,15 +233,15 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
       {/* Canvas - flex centering with transform for pan/zoom */}
       <div
         ref={containerRef}
-        className="h-full w-full flex items-center justify-center"
+        className="h-full w-full flex items-center justify-center transform-gpu"
         style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
         <div
+          ref={contentRef}
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transformOrigin: 'center center',

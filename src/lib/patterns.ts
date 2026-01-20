@@ -58,25 +58,33 @@ export class Patterns {
      * Concentric circles
      */
     static Concentric(
-        count: number, 
-        width: number, 
+        count: number,
+        width: number,
         height: number,
-        options?: { 
+        options?: {
             centerX?: number,  // 0-1, default 0.5
             centerY?: number,  // 0-1, default 0.5
             minRadius?: number // Starting radius, default 0
         }
     ): MakerJs.IModel {
         const model: MakerJs.IModel = { paths: {} };
-        const cx = (options?.centerX ?? 0.5) * width;
-        const cy = (options?.centerY ?? 0.5) * height;
+        // Ensure inputs are numbers and valid
+        const safeCount = Math.max(1, Math.floor(Number(count) || 20));
+        const cx = (Number(options?.centerX) ?? 0.5) * width;
+        const cy = (Number(options?.centerY) ?? 0.5) * height;
         const maxRadius = Math.min(width, height) / 2;
-        const minRadius = options?.minRadius ?? 0;
-        const step = (maxRadius - minRadius) / count;
+        const minRadius = Number(options?.minRadius) || 0;
 
-        for (let i = 1; i <= count; i++) {
+        // Prevent division by zero or negative step
+        if (minRadius >= maxRadius) return model;
+
+        const step = (maxRadius - minRadius) / safeCount;
+
+        for (let i = 1; i <= safeCount; i++) {
             const r = minRadius + i * step;
-            model.paths![`c_${i}`] = new MakerJs.paths.Circle([cx, cy], r);
+            if (r > 0) {
+                model.paths![`c_${i}`] = new MakerJs.paths.Circle([cx, cy], r);
+            }
         }
 
         return model;
@@ -104,7 +112,7 @@ export class Patterns {
         const startRadius = options?.startRadius ?? 0;
         const pointsPerTurn = options?.pointsPerTurn ?? 36;
         const direction = options?.direction === 'ccw' ? -1 : 1;
-        
+
         const totalPoints = turns * pointsPerTurn;
         const radiusStep = (maxRadius - startRadius) / totalPoints;
         const angleStep = (2 * Math.PI) / pointsPerTurn * direction;
@@ -117,7 +125,7 @@ export class Patterns {
             const r = startRadius + i * radiusStep;
             const x = cx + r * Math.cos(angle);
             const y = cy + r * Math.sin(angle);
-            
+
             model.paths![`sp_${i}`] = new MakerJs.paths.Line([prevX, prevY], [x, y]);
             prevX = x;
             prevY = y;
@@ -146,19 +154,19 @@ export class Patterns {
         const scale = Math.min(width, height) / 2;
         const innerR = (options?.innerRadius ?? 0) * scale;
         const outerR = (options?.outerRadius ?? 1) * scale;
-        
+
         const angleStep = (2 * Math.PI) / count;
 
         for (let i = 0; i < count; i++) {
             const angle = i * angleStep;
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
-            
+
             const x1 = cx + innerR * cos;
             const y1 = cy + innerR * sin;
             const x2 = cx + outerR * cos;
             const y2 = cy + outerR * sin;
-            
+
             model.paths![`r_${i}`] = new MakerJs.paths.Line([x1, y1], [x2, y2]);
         }
 
@@ -189,7 +197,7 @@ export class Patterns {
         for (let row = 0; row <= count; row++) {
             const baseY = row * stepY;
             const segWidth = width / segments;
-            
+
             for (let seg = 0; seg < segments; seg++) {
                 const x1 = seg * segWidth;
                 const x2 = (seg + 1) * segWidth;
@@ -197,7 +205,7 @@ export class Patterns {
                 const angle2 = (x2 / width) * frequency * Math.PI * 2 + phase;
                 const y1 = baseY + Math.sin(angle1) * amplitude;
                 const y2 = baseY + Math.sin(angle2) * amplitude;
-                
+
                 model.paths![`w_${row}_${seg}`] = new MakerJs.paths.Line([x1, y1], [x2, y2]);
             }
         }
@@ -220,11 +228,11 @@ export class Patterns {
         const model: MakerJs.IModel = { paths: {} };
         const angle = (options?.angle ?? 45) * Math.PI / 180;
         const bidirectional = options?.bidirectional ?? false;
-        
+
         // Calculate line spacing
         const diag = Math.hypot(width, height);
         const spacing = diag / count;
-        
+
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
 
@@ -234,23 +242,23 @@ export class Patterns {
             const s = Math.sin(ang);
             const perpC = -s;
             const perpS = c;
-            
+
             // Start from corner and move perpendicular to line direction
             for (let i = -count; i <= count * 2; i++) {
                 const offset = i * spacing;
                 const startX = width / 2 + perpC * offset;
                 const startY = height / 2 + perpS * offset;
-                
+
                 // Extend line in both directions
                 const x1 = startX - c * diag;
                 const y1 = startY - s * diag;
                 const x2 = startX + c * diag;
                 const y2 = startY + s * diag;
-                
+
                 // Clip to bounds (simple)
                 if ((x1 < 0 && x2 < 0) || (x1 > width && x2 > width)) continue;
                 if ((y1 < 0 && y2 < 0) || (y1 > height && y2 > height)) continue;
-                
+
                 model.paths![`${prefix}_${i}`] = new MakerJs.paths.Line(
                     [Math.max(0, Math.min(width, x1)), Math.max(0, Math.min(height, y1))],
                     [Math.max(0, Math.min(width, x2)), Math.max(0, Math.min(height, y2))]

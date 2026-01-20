@@ -10,7 +10,7 @@ export interface CanvasConfig {
 }
 
 // Mask types - geometric and procedural
-export type MaskType = 
+export type MaskType =
     | 'radial'      // Circular gradient
     | 'linear'      // Linear gradient
     | 'border'      // Edge feathering
@@ -34,17 +34,37 @@ export interface MaskConfig {
     op?: MaskOp;             // How to combine with previous mask (default: multiply)
 }
 
+// Layer Types
+
+export interface Layer {
+    id: string;
+    name: string;
+    steps: PipelineStep[];
+    visible: boolean;    // Required: whether layer is visible/rendered
+    color: string;       // Hex color code (e.g., "#FF5733")
+    opacity?: number;    // Optional: 0-1 for layer transparency
+}
+
+export interface LayerExportOptions {
+    mode: 'combined' | 'individual';  // Export all layers together or separately
+    format: 'svg' | 'gcode' | 'both';
+    layerId?: string;                 // If set, export only this specific layer
+}
+
 // Pipeline Types
 
 export interface PipelineStep {
     tool: string; // "stripes", "noise", "rotate"
     params: any;
     mask?: MaskConfig | MaskConfig[]; // Only applies to modifiers
+    enabled?: boolean; // If false, step is skipped (muted)
 }
 
 export interface PipelineParams {
-    steps: PipelineStep[];
-    seed?: number; // Global seed for reproducibility
+    steps: PipelineStep[];        // Flattened steps for backward compatibility
+    seed?: number;                // Global seed for reproducibility
+    layers?: Layer[];             // Array of layer objects (new layer system)
+    activeLayerId?: string;       // Currently selected layer in UI
 }
 
 export interface GCodeConfig {

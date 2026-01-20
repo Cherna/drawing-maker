@@ -4,6 +4,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 import { useConfigStore } from '../store/config-store';
 import { PipelineStep, MaskConfig } from '../../types';
+import MaskPreview from './MaskPreview';
 
 const MASK_TYPES = [
   'radial',
@@ -19,44 +20,37 @@ const MASK_TYPES = [
 interface MaskEditorProps {
   step: PipelineStep;
   index: number;
+  onChange: (mask: MaskConfig | undefined) => void;
 }
 
-export default function MaskEditor({ step, index }: MaskEditorProps) {
-  const updateStep = useConfigStore((state) => state.updateStep);
-
+export default function MaskEditor({ step, onChange }: MaskEditorProps) {
   const mask = step.mask as MaskConfig | undefined;
   const hasMask = !!mask && (typeof mask === 'object' && 'type' in mask);
 
   const handleMaskTypeChange = (type: string) => {
     if (type === 'none' || !type) {
-      updateStep(index, { mask: undefined });
+      onChange(undefined);
     } else {
-      updateStep(index, {
-        mask: {
-          type: type as MaskConfig['type'],
-          params: {},
-        },
+      onChange({
+        type: type as MaskConfig['type'],
+        params: {},
       });
     }
   };
 
   const updateMaskParam = (key: string, value: any) => {
     if (!hasMask) return;
-    updateStep(index, {
-      mask: {
-        ...mask,
-        params: { ...mask.params, [key]: value },
-      },
+    onChange({
+      ...mask,
+      params: { ...mask.params, [key]: value },
     });
   };
 
   const updateMaskOption = (key: keyof MaskConfig, value: any) => {
     if (!hasMask) return;
-    updateStep(index, {
-      mask: {
-        ...mask,
-        [key]: value,
-      },
+    onChange({
+      ...mask,
+      [key]: value,
     });
   };
 
@@ -114,6 +108,10 @@ export default function MaskEditor({ step, index }: MaskEditorProps) {
             onCheckedChange={(checked) => updateMaskOption('invert', checked)}
           />
           <Label className="text-sm cursor-pointer">Invert</Label>
+        </div>
+
+        <div className="pt-2">
+          <MaskPreview mask={mask} />
         </div>
       </div>
     </div>

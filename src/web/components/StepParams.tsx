@@ -2,8 +2,9 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-import { Slider } from './ui/slider';
+// Slider removed in favor of ScrubbableInput
 import { useConfigStore } from '../store/config-store';
+import ScrubbableInput from './ui/scrubbable-input';
 import { PipelineStep } from '../../types';
 import { TOOL_DEFINITIONS } from '../lib/tool-definitions';
 import MaskEditor from './MaskEditor';
@@ -36,12 +37,12 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
         const value = step.params[paramDef.key] !== undefined
           ? step.params[paramDef.key]
           : paramDef.default !== undefined
-          ? paramDef.default
-          : paramDef.type === 'number'
-          ? 0
-          : paramDef.type === 'boolean'
-          ? false
-          : '';
+            ? paramDef.default
+            : paramDef.type === 'number'
+              ? 0
+              : paramDef.type === 'boolean'
+                ? false
+                : '';
 
         if (paramDef.type === 'boolean') {
           return (
@@ -83,40 +84,17 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
         }
 
         if (paramDef.type === 'number') {
-          const hasRange = paramDef.min !== undefined && paramDef.max !== undefined;
-          const useSlider = hasRange && paramDef.max! - paramDef.min! < 100;
-
           return (
-            <div key={paramDef.key} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor={`${index}-${paramDef.key}`}>{paramDef.label}</Label>
-                {useSlider && (
-                  <span className="text-xs text-muted-foreground">{Number(value || 0).toFixed(2)}</span>
-                )}
-              </div>
-              {useSlider ? (
-                <Slider
-                  value={[Number(value || paramDef.default || 0)]}
-                  min={paramDef.min}
-                  max={paramDef.max}
-                  step={paramDef.step || 1}
-                  onValueChange={([val]) => updateParam(paramDef.key, val)}
-                />
-              ) : (
-                <Input
-                  id={`${index}-${paramDef.key}`}
-                  type="number"
-                  value={value || ''}
-                  min={paramDef.min}
-                  max={paramDef.max}
-                  step={paramDef.step || 1}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    updateParam(paramDef.key, val === '' ? undefined : Number(val));
-                  }}
-                />
-              )}
-            </div>
+            <ScrubbableInput
+              key={paramDef.key}
+              id={`${index}-${paramDef.key}`}
+              value={value === '' ? 0 : Number(value)}
+              onChange={(val) => updateParam(paramDef.key, val)}
+              min={paramDef.min}
+              max={paramDef.max}
+              step={paramDef.step}
+              label={paramDef.label}
+            />
           );
         }
 
@@ -134,7 +112,11 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
       })}
 
       {toolDef.hasMask && (
-        <MaskEditor step={step} index={index} />
+        <MaskEditor
+          step={step}
+          index={index}
+          onChange={(newMask) => updateParam('mask', newMask)}
+        />
       )}
     </div>
   );

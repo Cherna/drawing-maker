@@ -1,18 +1,27 @@
-import { Separator } from './ui/separator';
+import CollapsibleSection from './ui/collapsible-section';
 import CanvasControls from './CanvasControls';
 import GlobalControls from './GlobalControls';
-import StepsEditor from './StepsEditor';
+import LayersEditor from './LayersEditor';
+import FileControls from './FileControls';
 
 export default function Sidebar() {
   return (
-    <div className="h-full w-full overflow-y-auto">
-      <div className="space-y-4 p-4">
+    <div className="h-full w-full overflow-y-auto bg-card border-r">
+      <CollapsibleSection title="Project" defaultExpanded={false}>
+        <FileControls />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Canvas Settings" defaultExpanded={false}>
         <CanvasControls />
-        <Separator />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Global Settings" defaultExpanded={false}>
         <GlobalControls />
-        <Separator />
-        <StepsEditor />
-      </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Layers" defaultExpanded={true} className="border-b-0">
+        <LayersEditor />
+      </CollapsibleSection>
     </div>
   );
 }

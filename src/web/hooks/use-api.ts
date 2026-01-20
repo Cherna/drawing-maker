@@ -67,7 +67,7 @@ export function useConfigs() {
   return useQuery({
     queryKey: ['configs'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/api/configs`);
+      const response = await fetch(`${API_BASE}/api/sketches`);
       if (!response.ok) {
         throw new Error('Failed to load configs');
       }

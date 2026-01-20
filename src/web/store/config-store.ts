@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import { AppConfig, PipelineStep } from '../../types';
+import { AppConfig, PipelineStep, Layer } from '../../types';
 
 const defaultConfig: AppConfig = {
   sketch: 'pipeline',
   outputBaseName: 'drawing',
   canvas: {
-    width: 200,
-    height: 300,
+    width: 300,
+    height: 200,
     margin: 20,
   },
   gcode: {
@@ -21,6 +21,20 @@ const defaultConfig: AppConfig = {
       { tool: 'resample', params: { res: 1.0 } },
       { tool: 'noise', params: { scale: 0.05, magnitude: 5 } },
     ],
+    layers: [
+      {
+        id: 'base',
+        name: 'Base Layer',
+        steps: [
+          { tool: 'stripes', params: { lines: 100 } },
+          { tool: 'resample', params: { res: 1.0 } },
+          { tool: 'noise', params: { scale: 0.05, magnitude: 5 } },
+        ],
+        visible: true,
+        color: '#000000'
+      }
+    ],
+    activeLayerId: 'base'
   },
 };
 

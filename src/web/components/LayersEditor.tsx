@@ -2,22 +2,18 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { useConfigStore } from '../store/config-store';
-import { PipelineStep } from '../../types';
+import { PipelineStep, Layer } from '../../types';
 import LayerStepItem from './LayerStepItem';
-import { Plus, Copy, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Copy, Trash2, Eye, EyeOff, Download } from 'lucide-react';
 import { GENERATORS, MODIFIERS, TOOL_DEFINITIONS } from '../lib/tool-definitions';
 
-interface Layer {
-  id: string;
-  name: string;
-  steps: PipelineStep[];
-  visible?: boolean; // undefined = true
-}
+// Default color palette for new layers
+const DEFAULT_COLORS = ['#000000', '#FF5733', '#3357FF', '#33FF57', '#F033FF', '#FFBD33', '#FF33A1', '#33FFF5'];
 
 export default function LayersEditor() {
   const config = useConfigStore((state) => state.config);
   const updateConfig = useConfigStore((state) => state.updateConfig);
-  
+
   // Initialize layers from steps if not already set up
   const getLayers = (): Layer[] => {
     if (config.params?.layers && Array.isArray(config.params.layers) && config.params.layers.length > 0) {
@@ -28,7 +24,7 @@ export default function LayersEditor() {
       { id: 'base', name: 'Base Layer', steps: config.params?.steps || [], visible: true }
     ];
   };
-  
+
   const layers: Layer[] = getLayers();
 
   const activeLayerId = config.params?.activeLayerId || 'base';
@@ -38,13 +34,13 @@ export default function LayersEditor() {
   // Only includes visible layers
   const layersToSteps = (layers: Layer[]): PipelineStep[] => {
     const allSteps: PipelineStep[] = [];
-    
+
     // Add base layer steps (if visible)
     const baseLayer = layers.find(l => l.id === 'base');
     if (baseLayer && baseLayer.visible !== false) {
       allSteps.push(...baseLayer.steps);
     }
-    
+
     // Add other visible layers as duplicate + their steps
     layers.filter(l => l.id !== 'base' && l.visible !== false).forEach(layer => {
       // Add duplicate step to create layer copy
@@ -52,18 +48,18 @@ export default function LayersEditor() {
         tool: 'duplicate',
         params: { id: layer.id },
       });
-      
+
       // Add layer's steps
       allSteps.push(...layer.steps);
     });
-    
+
     return allSteps;
   };
 
   const handleAddStep = (toolName: string) => {
     const toolDef = TOOL_DEFINITIONS[toolName];
     const newParams: any = {};
-    
+
     if (toolDef) {
       toolDef.params.forEach((param) => {
         if (param.default !== undefined) {
@@ -156,16 +152,19 @@ export default function LayersEditor() {
 
   const handleCreateLayer = () => {
     const newLayerId = `layer_${layers.length}`;
+    // Assign a color from the palette, cycling through if needed
+    const colorIndex = layers.length % DEFAULT_COLORS.length;
     const newLayer: Layer = {
       id: newLayerId,
       name: `Layer ${layers.length}`,
       steps: [],
       visible: true,
+      color: DEFAULT_COLORS[colorIndex],
     };
 
     const updatedLayers = [...layers, newLayer];
     const flatSteps = layersToSteps(updatedLayers);
-    
+
     updateConfig({
       params: {
         ...config.params,
@@ -178,18 +177,20 @@ export default function LayersEditor() {
 
   const handleDuplicateLayer = () => {
     if (!activeLayer) return;
-    
+
     const newLayerId = `layer_${layers.length}`;
     const newLayer: Layer = {
       id: newLayerId,
       name: `${activeLayer.name} Copy`,
       steps: JSON.parse(JSON.stringify(activeLayer.steps)),
       visible: true,
+      color: activeLayer.color || '#000000', // Preserve the original layer's color!
+      opacity: activeLayer.opacity,
     };
 
     const updatedLayers = [...layers, newLayer];
     const flatSteps = layersToSteps(updatedLayers);
-    
+
     updateConfig({
       params: {
         ...config.params,
@@ -201,11 +202,15 @@ export default function LayersEditor() {
   };
 
   const handleDeleteLayer = (layerId: string) => {
-    if (layerId === 'base') return;
-    
+    // Check if we have more than 1 layer to allow deletion
+    if (layers.length <= 1) {
+      alert("Cannot delete the only layer.");
+      return;
+    }
+
     const updatedLayers = layers.filter(l => l.id !== layerId);
     const flatSteps = layersToSteps(updatedLayers);
-    
+
     updateConfig({
       params: {
         ...config.params,
@@ -225,7 +230,7 @@ export default function LayersEditor() {
     });
 
     const flatSteps = layersToSteps(updatedLayers);
-    
+
     updateConfig({
       params: {
         ...config.params,
@@ -233,6 +238,59 @@ export default function LayersEditor() {
         steps: flatSteps,
       }
     });
+  };
+
+  const handleUpdateLayerColor = (layerId: string, color: string) => {
+    const updatedLayers = layers.map(layer =>
+      layer.id === layerId ? { ...layer, color } : layer
+    );
+
+    const flatSteps = layersToSteps(updatedLayers);
+    updateConfig({
+      params: {
+        ...config.params,
+        layers: updatedLayers,
+        steps: flatSteps,
+      }
+    });
+  };
+
+  const handleExportLayer = async (layerId: string) => {
+    const layer = layers.find(l => l.id === layerId);
+    if (!layer) return;
+
+    try {
+      const response = await fetch(`/api/export?layerId=${layerId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+
+      if (!response.ok) throw new Error('Export failed');
+      const data = await response.json();
+
+      // Download SVG
+      const svgBlob = new Blob([data.svg], { type: 'image/svg+xml' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const svgLink = document.createElement('a');
+      svgLink.href = svgUrl;
+      svgLink.download = `${layer.name.replace(/\s+/g, '_')}.svg`;
+      svgLink.click();
+
+      // Download G-Code
+      const gcodeBlob = new Blob([data.gcode], { type: 'text/plain' });
+      const gcodeUrl = URL.createObjectURL(gcodeBlob);
+      const gcodeLink = document.createElement('a');
+      gcodeLink.href = gcodeUrl;
+      gcodeLink.download = `${layer.name.replace(/\s+/g, '_')}.gcode`;
+      gcodeLink.click();
+
+      URL.revokeObjectURL(svgUrl);
+      URL.revokeObjectURL(gcodeUrl);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Failed to export layer');
+    }
   };
 
   const handleSwitchLayer = (layerId: string) => {
@@ -246,18 +304,9 @@ export default function LayersEditor() {
 
   const pipelineSteps = activeLayer.steps;
   const isLayerVisible = activeLayer.visible !== false;
-  
-  // Check if base layer has any generators (required for modifiers to make sense)
-  const baseLayer = layers.find(l => l.id === 'base');
-  const baseHasGenerators = baseLayer?.steps.some(step => 
-    TOOL_DEFINITIONS[step.tool]?.category === 'generator'
-  ) || false;
-  
-  // For non-base layers: modifiers are only allowed if base has generators
-  // (since non-base layers duplicate the base, so they need something to duplicate)
-  const canAddModifiers = activeLayerId === 'base' 
-    ? (baseHasGenerators || pipelineSteps.some(step => TOOL_DEFINITIONS[step.tool]?.category === 'generator'))
-    : baseHasGenerators; // Non-base layers need base to have generators
+
+  // Modifiers are only allowed if the current layer has at least one generator
+  const canAddModifiers = pipelineSteps.some(step => TOOL_DEFINITIONS[step.tool]?.category === 'generator');
 
   return (
     <Card>
@@ -294,15 +343,14 @@ export default function LayersEditor() {
             {layers.map((layer) => {
               const isActive = layer.id === activeLayerId;
               const isVisible = layer.visible !== false;
-              
+
               return (
                 <div
                   key={layer.id}
-                  className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
-                    isActive 
-                      ? 'bg-primary/10 border border-primary/30' 
-                      : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
-                  }`}
+                  className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${isActive
+                    ? 'bg-primary/10 border border-primary/30'
+                    : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
+                    }`}
                   onClick={() => handleSwitchLayer(layer.id)}
                 >
                   {/* Visibility toggle */}
@@ -322,32 +370,58 @@ export default function LayersEditor() {
                       <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
                   </Button>
-                  
+
+                  {/* Color picker */}
+                  <input
+                    type="color"
+                    value={layer.color || '#000000'}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleUpdateLayerColor(layer.id, e.target.value);
+                    }}
+                    className="h-6 w-6 rounded border border-border cursor-pointer shrink-0"
+                    title="Change layer color"
+                  />
+
                   {/* Layer name */}
                   <span className={`flex-1 text-sm truncate ${!isVisible ? 'text-muted-foreground' : ''}`}>
                     {layer.name}
                   </span>
-                  
+
                   {/* Step count */}
                   <span className="text-xs text-muted-foreground">
                     {layer.steps.length} step{layer.steps.length !== 1 ? 's' : ''}
                   </span>
-                  
-                  {/* Delete button (not for base) */}
-                  {layer.id !== 'base' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteLayer(layer.id);
-                      }}
-                      title="Delete layer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+
+                  {/* Export button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExportLayer(layer.id);
+                    }}
+                    title="Export this layer"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+
+                  {/* Delete button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteLayer(layer.id);
+                    }}
+                    title="Delete layer"
+                    disabled={layers.length <= 1}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               );
             })}
@@ -366,7 +440,7 @@ export default function LayersEditor() {
           </div>
           {pipelineSteps.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">
-              {activeLayerId === 'base' 
+              {activeLayerId === 'base'
                 ? 'Add a generator to start drawing.'
                 : 'Add tools to modify this layer.'}
             </p>
@@ -421,12 +495,12 @@ export default function LayersEditor() {
             )}
           </SelectContent>
         </Select>
-        
+
         {/* Layer explanation */}
         {activeLayerId !== 'base' && (
           <p className="text-xs text-muted-foreground">
-            Non-base layers start with a copy of all previous layers. 
-            Add generators/modifiers to build on top.
+            Non-base layers are independent.
+            Start by adding a generator (e.g. Stripes, Grid).
           </p>
         )}
       </CardContent>

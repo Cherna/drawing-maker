@@ -5,7 +5,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { PipelineStep } from '../../types';
 import { TOOL_DEFINITIONS, GENERATORS, MODIFIERS } from '../lib/tool-definitions';
 import StepParams from './StepParams';
-import { X, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface LayerStepItemProps {
@@ -37,7 +37,7 @@ export default function LayerStepItem({
   const handleToolChange = (newTool: string) => {
     const newToolDef = TOOL_DEFINITIONS[newTool];
     const newParams: any = {};
-    
+
     // Set defaults for new tool
     if (newToolDef) {
       newToolDef.params.forEach((param) => {
@@ -66,18 +66,33 @@ export default function LayerStepItem({
           >
             {index + 1}.
           </button>
-          <Select value={step.tool} onValueChange={handleToolChange}>
-            <SelectTrigger className="flex-1 h-8 text-sm">
-              {toolDef?.label || step.tool}
-            </SelectTrigger>
-            <SelectContent>
-              {availableTools.map((tool) => (
-                <SelectItem key={tool} value={tool}>
-                  {TOOL_DEFINITIONS[tool]?.label || tool}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex-1 flex items-center gap-2">
+            <Select value={step.tool} onValueChange={handleToolChange}>
+              <SelectTrigger className="flex-1 h-8 text-sm">
+                {toolDef?.label || step.tool}
+              </SelectTrigger>
+              <SelectContent>
+                {availableTools.map((tool) => (
+                  <SelectItem key={tool} value={tool}>
+                    {TOOL_DEFINITIONS[tool]?.label || tool}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => onUpdate(index, { enabled: step.enabled === false })}
+              title={step.enabled === false ? "Enable step" : "Mute step"}
+            >
+              {step.enabled === false ? (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
           <div className="flex items-center gap-1">
             {canMoveUp && (
               <Button
@@ -119,9 +134,15 @@ export default function LayerStepItem({
               step={step}
               index={index}
               onUpdate={(key, value) => {
-                onUpdate(index, {
-                  params: { ...step.params, [key]: value }
-                });
+                // If key is 'mask', update it on the step root
+                if (key === 'mask') {
+                  onUpdate(index, { mask: value });
+                } else {
+                  // Otherwise update params
+                  onUpdate(index, {
+                    params: { ...step.params, [key]: value }
+                  });
+                }
               }}
             />
           </div>
