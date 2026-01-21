@@ -1,29 +1,59 @@
 import MakerJs from 'makerjs';
 import { CanvasConfig } from '../types';
 
+// Helper to process a path and convert to SVG string, pushing to lines array
+// Handles Y-flip (Cartesian -> SVG) replacement
+function processPathToLines(
+    path: MakerJs.IPath,
+    offsetX: number,
+    offsetY: number,
+    canvasHeight: number,
+    lines: string[]
+) {
+    if (path.type === 'line') {
+        const line = path as MakerJs.IPathLine;
+        const x1 = (line.origin[0] + offsetX).toFixed(3);
+        const y1 = (canvasHeight - (line.origin[1] + offsetY)).toFixed(3);
+        const x2 = (line.end[0] + offsetX).toFixed(3);
+        const y2 = (canvasHeight - (line.end[1] + offsetY)).toFixed(3);
+        lines.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
+    } else if (path.type === 'circle') {
+        const circle = path as MakerJs.IPathCircle;
+        const cx = (circle.origin[0] + offsetX).toFixed(3);
+        const cy = (canvasHeight - (circle.origin[1] + offsetY)).toFixed(3);
+        const r = circle.radius.toFixed(3);
+        lines.push(`<circle cx="${cx}" cy="${cy}" r="${r}" />`);
+    } else if (path.type === 'arc') {
+        const arc = path as MakerJs.IPathArc;
+        const startRad = arc.startAngle * Math.PI / 180;
+        const endRad = arc.endAngle * Math.PI / 180;
+
+        // Calculate points in Cartesian space relative to origin
+        const startPt = MakerJs.point.add(arc.origin, MakerJs.point.fromPolar(startRad, arc.radius));
+        const endPt = MakerJs.point.add(arc.origin, MakerJs.point.fromPolar(endRad, arc.radius));
+
+        // Transform to SVG coordinates (Y flip)
+        const sx = (startPt[0] + offsetX).toFixed(3);
+        const sy = (canvasHeight - (startPt[1] + offsetY)).toFixed(3);
+        const ex = (endPt[0] + offsetX).toFixed(3);
+        const ey = (canvasHeight - (endPt[1] + offsetY)).toFixed(3);
+        const r = arc.radius.toFixed(3);
+
+        const largeArc = Math.abs(arc.endAngle - arc.startAngle) >= 180 ? 1 : 0;
+        // Sweep flag 0 for CCW in Cartesian (which is CCW/Negative-Rotation in SVG Y-down)
+        const sweep = 0;
+
+        lines.push(`<path d="M ${sx} ${sy} A ${r} ${r} 0 ${largeArc} ${sweep} ${ex} ${ey}" />`);
+    }
+}
+
 /**
  * Custom SVG exporter that preserves canvas coordinates.
  * MakerJs.exporter.toSVG auto-shifts coordinates to (0,0) which breaks our centering.
  */
 export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string {
     const lines: string[] = [];
-
-    // Walk all paths and collect SVG line elements
-    // In our model: Y=0 is at bottom (G-code style)
-    // In SVG: Y=0 is at top
-    // So we flip Y: svg_y = canvasHeight - model_y
     const canvasHeight = canvas.height;
-
-    function processPath(path: MakerJs.IPath, offsetX: number = 0, offsetY: number = 0) {
-        if (path.type === 'line') {
-            const line = path as MakerJs.IPathLine;
-            const x1 = (line.origin[0] + offsetX).toFixed(3);
-            const y1 = (canvasHeight - (line.origin[1] + offsetY)).toFixed(3);
-            const x2 = (line.end[0] + offsetX).toFixed(3);
-            const y2 = (canvasHeight - (line.end[1] + offsetY)).toFixed(3);
-            lines.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
-        }
-    }
 
     function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
         // Account for model's origin if it has one
@@ -33,7 +63,7 @@ export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string 
 
         if (m.paths) {
             for (const p of Object.values(m.paths)) {
-                processPath(p, newOffsetX, newOffsetY);
+                processPathToLines(p, newOffsetX, newOffsetY, canvasHeight, lines);
             }
         }
         if (m.models) {
@@ -71,17 +101,6 @@ export function modelToSVGWithColor(
     const lines: string[] = [];
     const canvasHeight = canvas.height;
 
-    function processPath(path: MakerJs.IPath, offsetX: number = 0, offsetY: number = 0) {
-        if (path.type === 'line') {
-            const line = path as MakerJs.IPathLine;
-            const x1 = (line.origin[0] + offsetX).toFixed(3);
-            const y1 = (canvasHeight - (line.origin[1] + offsetY)).toFixed(3);
-            const x2 = (line.end[0] + offsetX).toFixed(3);
-            const y2 = (canvasHeight - (line.end[1] + offsetY)).toFixed(3);
-            lines.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
-        }
-    }
-
     function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
         const modelOrigin = m.origin || [0, 0];
         const newOffsetX = offsetX + modelOrigin[0];
@@ -89,7 +108,7 @@ export function modelToSVGWithColor(
 
         if (m.paths) {
             for (const p of Object.values(m.paths)) {
-                processPath(p, newOffsetX, newOffsetY);
+                processPathToLines(p, newOffsetX, newOffsetY, canvasHeight, lines);
             }
         }
         if (m.models) {
@@ -136,17 +155,6 @@ export function layersToSVG(
         const lines: string[] = [];
         const { model, color, opacity = 1.0 } = data;
 
-        function processPath(path: MakerJs.IPath, offsetX: number = 0, offsetY: number = 0) {
-            if (path.type === 'line') {
-                const line = path as MakerJs.IPathLine;
-                const x1 = (line.origin[0] + offsetX).toFixed(3);
-                const y1 = (canvasHeight - (line.origin[1] + offsetY)).toFixed(3);
-                const x2 = (line.end[0] + offsetX).toFixed(3);
-                const y2 = (canvasHeight - (line.end[1] + offsetY)).toFixed(3);
-                lines.push(`    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
-            }
-        }
-
         function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
             const modelOrigin = m.origin || [0, 0];
             const newOffsetX = offsetX + modelOrigin[0];
@@ -154,7 +162,7 @@ export function layersToSVG(
 
             if (m.paths) {
                 for (const p of Object.values(m.paths)) {
-                    processPath(p, newOffsetX, newOffsetY);
+                    processPathToLines(p, newOffsetX, newOffsetY, canvasHeight, lines);
                 }
             }
             if (m.models) {
@@ -184,4 +192,3 @@ ${layerGroups.join('\n')}
 
     return svg;
 }
-

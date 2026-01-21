@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import MakerJs from 'makerjs';
-import { GCodeExporter } from './core/gcode-exporter';
+import { generateGCode } from './core/gcode';
 import { modelToSVG } from './core/svg-exporter';
 import { AppConfig, SketchGenerator } from './types';
 import { PipelineSketch } from './sketches/pipeline-sketch';
@@ -63,7 +63,7 @@ async function main() {
         const model = await generator.generate(config.canvas, config.params);
 
         // 4. Export G-Code
-        const gcode = GCodeExporter.export(model, config.gcode);
+        const gcode = generateGCode(model, config, config.gcode.postProcessor || 'standard');
 
         // 5. Save Files
         const outputDir = path.join(__dirname, '../drawings');

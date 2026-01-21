@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs';
 import { AppConfig, Layer } from '../types';
 import { PipelineSketch } from '../sketches/pipeline-sketch';
-import { PipelineSketch } from '../sketches/pipeline-sketch';
 import { generateGCode, generateGCodeForLayers } from '../core/gcode';
 import { modelToSVG, layersToSVG, modelToSVGWithColor } from '../core/svg-exporter';
 import { Pipeline } from '../core/pipeline';
@@ -100,6 +99,8 @@ app.post('/api/preview', async (req, res) => {
             res.json({ svg });
         }
     } catch (error: any) {
+        console.error('Preview error:', error);
+        console.error('Stack trace:', error.stack);
         res.status(500).json({ error: error.message });
     }
 });

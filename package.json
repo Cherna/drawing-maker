@@ -4,10 +4,12 @@
   "description": "Generative G-Code Generator",
   "main": "src/main.ts",
   "scripts": {
-    "dev": "concurrently -n \"API,VITE\" -c \"blue,green\" \"npm run api\" \"vite --host\"",
+    "dev": "npm run clean-ports && concurrently --kill-others -n \"API,VITE\" -c \"blue,green\" \"npm run api\" \"vite --host\"",
     "api": "nodemon --exec \"ts-node --transpile-only\" --watch src/gui --watch src/core --watch src/lib --watch src/types.ts src/gui/server.ts",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clean-ports": "node scripts/cleanup-ports.js",
+    "stop": "npm run clean-ports"
   },
   "keywords": [],
   "author": "",

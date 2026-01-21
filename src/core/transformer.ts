@@ -14,8 +14,24 @@ export class Transformer {
             const divisions = Math.max(1, Math.ceil(len / resolution));
             const segmentModel: MakerJs.IModel = { paths: {} };
 
-            // Start point
-            let prev = MakerJs.point.fromPathEnds(path)[0];
+            // Start point - circles need special handling
+            let prev: MakerJs.IPoint;
+            if (path.type === 'circle' || path.type === 'arc') {
+                const arc = path as MakerJs.IPathArc;
+                // Circles might not have startAngle set, default to 0
+                const startAngle = arc.startAngle !== undefined ? arc.startAngle : 0;
+                // FIX: Convert to radians for fromPolar
+                const startRad = startAngle * Math.PI / 180;
+                const polar = MakerJs.point.fromPolar(startRad, arc.radius);
+                prev = MakerJs.point.add(polar, arc.origin!);
+            } else {
+                const ends = MakerJs.point.fromPathEnds(path);
+                if (!ends) {
+                    console.warn(`Transformer.resample: Cannot get path ends for path type '${path.type}'`);
+                    return { paths: {} };
+                }
+                prev = ends[0];
+            }
 
             for (let i = 1; i <= divisions; i++) {
                 let curr: MakerJs.IPoint;
@@ -31,14 +47,23 @@ export class Transformer {
                     ];
                 } else if (path.type === 'arc' || path.type === 'circle') {
                     const arc = path as MakerJs.IPathArc;
-                    const endAngle = MakerJs.angle.ofArcEnd(arc);
-                    const totalAngle = endAngle - arc.startAngle;
-                    const currentAngle = arc.startAngle + totalAngle * t;
-                    const polar = MakerJs.point.fromPolar(currentAngle, arc.radius);
+                    // Circles might not have startAngle set, default to 0 (full circle)
+                    const startAngle = arc.startAngle !== undefined ? arc.startAngle : 0;
+                    const endAngle = arc.endAngle !== undefined ? arc.endAngle : 360;
+                    const totalAngle = endAngle - startAngle;
+                    const currentAngle = startAngle + totalAngle * t;
+                    // MakerJs.point.fromPolar expects RADIANS, but Arcs use DEGREES
+                    const currRad = currentAngle * Math.PI / 180;
+                    const polar = MakerJs.point.fromPolar(currRad, arc.radius);
                     curr = MakerJs.point.add(polar, arc.origin!);
                 } else {
-                    // Fallback for paths we don't interpolate yet
-                    curr = MakerJs.point.fromPathEnds(path)[1]; // just end point
+                    // Fallback for paths we don't interpolate yet (like Bezier)
+                    // We should try to use MakerJs.path.interpolate or similar if available,
+                    // but for now, let's just use the end point to avoid crashing.
+                    // Ideally, we should flatten the model before this step if possible.
+                    console.warn(`Transformer: Unhandled path type '${path.type}'`);
+                    const ends = MakerJs.point.fromPathEnds(path);
+                    curr = ends ? ends[1] : [0, 0];
                 }
 
                 segmentModel.paths![`seg_${i}`] = new MakerJs.paths.Line(prev, curr);
@@ -63,6 +88,15 @@ export class Transformer {
                 }
             }
         };
+
+        // Pre-process: Simplify/Flatten the model to convert Bezier curves to Arcs/Lines if possible?
+        // Actually, better to just rely on processPath handling Beziers if we add support.
+        // But MakerJs.path.distort can turn Bezier to Arcs?
+
+        // Let's modify the traverse loop to handle "Curve" models (Bezier) specifically if they don't have paths?
+        // The debug output said Curve_1 had 'type', 'seed', 'accuracy', 'paths'.
+        // Wait, if it has 'paths', traverse should catch it.
+        // But debug said paths: undefined/empty?
 
         traverse(model, result);
         return result;
