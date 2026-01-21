@@ -100,19 +100,7 @@ export default function CanvasControls() {
                 onChange={(e) => updateCanvas({ height: parseFloat(e.target.value) || 200 })}
               />
             </div>
-            <div className="col-span-2 space-y-2 pt-2 border-t border-border">
-              <Label htmlFor="stroke-width" className="text-xs">Pen Width (mm)</Label>
-              <Input
-                id="stroke-width"
-                type="number"
-                min="0.05"
-                max="5.0"
-                step="0.05"
-                className="h-8"
-                value={canvas.strokeWidth ?? 0.4}
-                onChange={(e) => updateCanvas({ strokeWidth: parseFloat(e.target.value) })}
-              />
-            </div>
+            {/* Pen Width Removed - moved to Per-Layer Settings */}
           </div>
         </div>
         <div className="space-y-2">
@@ -154,7 +142,7 @@ export default function CanvasControls() {
           <GCodeSettings />
         </div>
       </CardContent>
-    </Card>
+    </Card >
   );
 }
 

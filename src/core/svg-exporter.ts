@@ -96,7 +96,8 @@ export function modelToSVGWithColor(
     model: MakerJs.IModel,
     canvas: CanvasConfig,
     color: string = '#000000',
-    opacity: number = 1.0
+    opacity: number = 1.0,
+    strokeWidth: number = 0.25
 ): string {
     const lines: string[] = [];
     const canvasHeight = canvas.height;
@@ -127,7 +128,7 @@ export function modelToSVGWithColor(
      height="${canvas.height}mm" 
      viewBox="0 0 ${canvas.width} ${canvas.height}"
      style="background-color: #FAF8F3;">
-  <g stroke="${color}" stroke-width="0.25" fill="none" stroke-linecap="round"${opacityAttr}>
+  <g stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
     ${lines.join('\n    ')}
   </g>
 </svg>`;
@@ -144,7 +145,7 @@ export function modelToSVGWithColor(
  * @returns Combined SVG string with all layers
  */
 export function layersToSVG(
-    layerData: Map<string, { model: MakerJs.IModel, color: string, opacity?: number }>,
+    layerData: Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>,
     canvas: CanvasConfig
 ): string {
     const canvasHeight = canvas.height;
@@ -153,7 +154,7 @@ export function layersToSVG(
     // Process each layer
     for (const [layerId, data] of layerData.entries()) {
         const lines: string[] = [];
-        const { model, color, opacity = 1.0 } = data;
+        const { model, color, opacity = 1.0, strokeWidth = 0.25 } = data;
 
         function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
             const modelOrigin = m.origin || [0, 0];
@@ -177,7 +178,7 @@ export function layersToSVG(
         const opacityAttr = opacity < 1.0 ? ` stroke-opacity="${opacity.toFixed(2)}"` : '';
 
         // Create a group for this layer
-        layerGroups.push(`  <g id="${layerId}" stroke="${color}" stroke-width="0.25" fill="none" stroke-linecap="round"${opacityAttr}>
+        layerGroups.push(`  <g id="${layerId}" stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
 ${lines.join('\n')}
   </g>`);
     }

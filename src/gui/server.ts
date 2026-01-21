@@ -77,14 +77,15 @@ app.post('/api/preview', async (req, res) => {
             const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed);
 
             // Build layer data map with colors for SVG export
-            const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number }>();
+            const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
             for (const layer of layers) {
                 const model = layerModels.get(layer.id);
                 if (model) {
                     layerData.set(layer.id, {
                         model,
                         color: layer.color || '#000000',
-                        opacity: layer.opacity
+                        opacity: layer.opacity,
+                        strokeWidth: layer.strokeWidth
                     });
                 }
             }
@@ -131,7 +132,7 @@ app.post('/api/export', async (req, res) => {
                 return;
             }
 
-            const svg = modelToSVGWithColor(model, config.canvas, layer.color || '#000000', layer.opacity);
+            const svg = modelToSVGWithColor(model, config.canvas, layer.color || '#000000', layer.opacity, layer.strokeWidth);
             const gcode = generateGCode(model, config, config.gcode.postProcessor || 'standard');
 
             res.json({ svg, gcode, layerName: layer.name });
@@ -151,7 +152,7 @@ app.post('/api/export', async (req, res) => {
                     const model = layerModels.get(layer.id);
                     if (model) {
                         layerExports[layer.id] = {
-                            svg: modelToSVGWithColor(model, config.canvas, layer.color || '#000000', layer.opacity),
+                            svg: modelToSVGWithColor(model, config.canvas, layer.color || '#000000', layer.opacity, layer.strokeWidth),
                             gcode: generateGCode(model, config, config.gcode.postProcessor || 'standard'),
                             name: layer.name
                         };
@@ -161,14 +162,15 @@ app.post('/api/export', async (req, res) => {
                 res.json({ layers: layerExports });
             } else {
                 // Export combined (default)
-                const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number }>();
+                const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
                 for (const layer of layers) {
                     const model = layerModels.get(layer.id);
                     if (model) {
                         layerData.set(layer.id, {
                             model,
                             color: layer.color || '#000000',
-                            opacity: layer.opacity
+                            opacity: layer.opacity,
+                            strokeWidth: layer.strokeWidth
                         });
                     }
                 }

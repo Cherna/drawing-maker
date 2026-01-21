@@ -384,6 +384,31 @@ export default function LayersEditor() {
                     title="Change layer color"
                   />
 
+                  {/* Stroke Width input */}
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="5.0"
+                    step="0.05"
+                    value={layer.strokeWidth || 0.25}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      // We need a handleUpdateLayerStrokeWidth function or similar
+                      // Since I can't add a new function easily in this replace block without context,
+                      // I'll inline the update logic or use a new handler if I can add it.
+                      // Ideally I'd use updateConfig directly here.
+                      const updatedLayers = layers.map(l =>
+                        l.id === layer.id ? { ...l, strokeWidth: parseFloat(e.target.value) } : l
+                      );
+                      updateConfig({
+                        params: { ...config.params, layers: updatedLayers, steps: layersToSteps(updatedLayers) }
+                      });
+                    }}
+                    className="h-6 w-12 text-xs px-1 rounded border border-border bg-background shrink-0"
+                    title="Stroke Width (mm)"
+                  />
+
                   {/* Layer name */}
                   <span className={`flex-1 text-sm truncate ${!isVisible ? 'text-muted-foreground' : ''}`}>
                     {layer.name}

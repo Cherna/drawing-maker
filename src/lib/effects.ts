@@ -22,6 +22,19 @@ export interface NoiseOptions {
     lacunarity?: number;    // Frequency growth per octave
 }
 
+// Helper to check if model contains any arcs or circles
+function modelHasArcs(model: MakerJs.IModel): boolean {
+    let found = false;
+    MakerJs.model.walk(model, {
+        onPath: (wp) => {
+            if (wp.pathContext.type === 'arc' || wp.pathContext.type === 'circle') {
+                found = true;
+            }
+        }
+    });
+    return found;
+}
+
 export class Effects {
     static resample(model: MakerJs.IModel, distance: number) {
         return Transformer.resample(model, distance);
@@ -32,6 +45,28 @@ export class Effects {
      * Supports single-octave and multi-octave (turbulence) noise
      */
     static noise(model: MakerJs.IModel, options: NoiseOptions, mask?: (x: number, y: number) => number) {
+        // Auto-resample if model contains curves, as displace only works on lines
+        if (modelHasArcs(model)) {
+            // Use a default reasonable resolution (e.g. 0.5mm) if not specified
+            // Since we are modifying in place (conceptually), we update the reference
+            // But resample returns a NEW model. We must return it.
+            // However, the pipeline expects us to modify the passed model or return a new one.
+            // Our signature is static noise(model, ...).
+            // Code in pipeline: Effects.noise(model, ...)
+            // It ignores return value! 
+            // WAIT: pipeline.ts says: 
+            // 'noise': (model, params, ...) => { Effects.noise(model, ...); }
+            // Effects.noise returns model, but pipeline ignores it?
+            // "if (result) currentModel = result;" in pipeline.
+            // So we MUST return the new model if we resample.
+
+            const resampled = Transformer.resample(model, 0.5);
+            // Replace contents of original model with resampled one?
+            // Or just return resampled?
+            // If we return resampled, pipeline will use it.
+            model = resampled;
+        }
+
         const seed = options.seed ?? Date.now();
         const rng = seededRandom(seed);
         const noise2D = createNoise2D(rng);
@@ -108,35 +143,7 @@ export class Effects {
                     // Mask value 0..1 (0=black=delete, 1=white=keep)
                     const val = mask(mid[0], mid[1]);
 
-                    // Probabilistic trimming
-                    // val=1 (keep), bias=0 -> rng > 1? false. Keep.
-                    // Wait, rng() > val means: if 0.9 > 0.8 (true) -> DELETE.
-                    // So val=1 (white) -> rng > 1 (false) -> KEEP. Correct.
-                    // val=0 (black) -> rng > 0 (true) -> DELETE. Correct.
-
-                    // With Bias:
-                    // threshold=1 (Keep All) -> bias = -0.5. Check: rng > val - 0.5.
-                    // val=0 -> rng > -0.5 (True). Deletes. WRONG.
-
-                    // Let's rethink.
-                    // We want Probability of KEEPING = P_keep.
-                    // Current: Delete if rng > val. P_delete = (1 - val). P_keep = val.
-
-                    // Target: threshold adjusts P_keep.
-                    // threshold 0.5 -> P_keep = val.
-                    // threshold 1.0 -> P_keep = 1.
-                    // threshold 0.0 -> P_keep = 0.
-
-                    // P_keep = val * (threshold * 2)? (Linear scale)
-                    // Or shift? P_keep = val + (threshold - 0.5).
-
                     const pKeep = val + (threshold - 0.5);
-                    // P_delete = 1 - pKeep
-                    // Delete if rng < P_delete? Or rng > pKeep? (if rng 0..1)
-
-                    // If rng() < (1 - pKeep) -> Delete.
-                    // rng < 1 - (val + thresh - 0.5)
-                    // rng < 1.5 - val - thresh
 
                     if (rng() > pKeep) {
                         delete m.paths[id];
@@ -161,6 +168,15 @@ export class Effects {
         const sy = scaleY ?? scaleX;
         const ox = origin?.[0] ?? 0;
         const oy = origin?.[1] ?? 0;
+
+        // Optimized scale has been removed due to offset issues.
+        // Always usage displace (with auto-resample for arcs).
+
+        // Non-uniform scale: MakerJs doesn't support this well for Arcs (Ellipses).
+        // So we fallback to displace, but we MUST resample arcs first.
+        if (modelHasArcs(model)) {
+            model = Transformer.resample(model, 0.5);
+        }
 
         Transformer.displace(model, (x, y) => ({
             x: (x - ox) * scaleX + ox,
@@ -210,6 +226,11 @@ export class Effects {
         warpFn: (x: number, y: number) => { dx: number, dy: number },
         mask?: (x: number, y: number) => number
     ) {
+        // Auto-resample arcs/circles
+        if (modelHasArcs(model)) {
+            model = Transformer.resample(model, 0.5);
+        }
+
         Transformer.displace(model, (x, y) => {
             const weight = mask ? mask(x, y) : 1;
             const { dx, dy } = warpFn(x, y);

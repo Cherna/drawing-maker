@@ -145,7 +145,6 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     label: 'Scale',
     params: [
       { key: 'uniform', label: 'Uniform', type: 'boolean', default: true },
-      { key: 'scale', label: 'Scale', type: 'number', min: 0.1, max: 5, step: 0.01, default: 1 },
       { key: 'x', label: 'Scale X', type: 'number', min: 0.1, max: 5, step: 0.01, default: 1 },
       { key: 'y', label: 'Scale Y', type: 'number', min: 0.1, max: 5, step: 0.01, default: 1 },
     ],

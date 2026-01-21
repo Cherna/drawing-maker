@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Input } from './input';
 import { Label } from './label';
+import { Button } from './button';
 import { cn } from '../../lib/utils';
-import { GripHorizontal } from 'lucide-react';
+import { GripHorizontal, Minus, Plus } from 'lucide-react';
 
 interface ScrubbableInputProps {
     id?: string;
@@ -50,28 +51,23 @@ export default function ScrubbableInput({
         const isPrecision = e.shiftKey;
 
         // Determine multiplier (shift = slower)
-        // Adjust sensitivity: 1 pixel = 1 step? Might be too fast.
-        // Let's say 2 pixels = 1 step, or 10 pixels if precision.
         const sensitivity = isPrecision ? 0.1 : 1.0;
 
         // Calculate new value
-        // Use step to determine magnitude of change per pixel
-        // If step is 0.1, then 10px move = 1.0 change?
-        // Let's try: delta * step * sensitivity
         const change = deltaX * (step || 1) * sensitivity;
-
         let newValue = startValueRef.current + change;
 
         // Clamp
         newValue = Math.max(min, Math.min(max, newValue));
 
-        // Round to step precision to avoid floating point weirdness
+        // Round to step precision
         if (step) {
             const precision = step.toString().split('.')[1]?.length || 0;
             newValue = Number(newValue.toFixed(precision));
         }
 
         onChange(newValue);
+        setLocalValue(String(newValue)); // FIX: Update local value while dragging
     }, [isDragging, min, max, step, onChange]);
 
     const handleMouseUp = useCallback(() => {
@@ -111,8 +107,6 @@ export default function ScrubbableInput({
         const newVal = e.target.value;
         setLocalValue(newVal);
 
-        // Try to parse - if valid number, emit change
-        // Allow "-" or empty to just sit in local state without firing onChange
         if (newVal === '' || newVal === '-') return;
 
         const num = parseFloat(newVal);
@@ -122,9 +116,24 @@ export default function ScrubbableInput({
     };
 
     const handleBlur = () => {
-        // On blur, force sync with valid numeric value from parent
-        // or effectively "reset" invalid input
         setLocalValue(String(value));
+    };
+
+    const stepValue = step || 1;
+
+    const handleIncrement = () => {
+        const newVal = Math.min(max, value + stepValue);
+        // Fix precision issues (e.g. 0.1 + 0.2 = 0.300000000004)
+        const precision = stepValue.toString().split('.')[1]?.length || 0;
+        const rounded = Number(newVal.toFixed(precision));
+        onChange(rounded);
+    };
+
+    const handleDecrement = () => {
+        const newVal = Math.max(min, value - stepValue);
+        const precision = stepValue.toString().split('.')[1]?.length || 0;
+        const rounded = Number(newVal.toFixed(precision));
+        onChange(rounded);
     };
 
     return (
@@ -141,20 +150,44 @@ export default function ScrubbableInput({
                     </Label>
                 </div>
             )}
-            <div className="relative">
-                <Input
-                    id={id}
-                    ref={inputRef}
-                    type="text" // Change to text to allow "-"
-                    inputMode="decimal"
-                    value={localValue}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    className={cn(
-                        isDragging && "cursor-ew-resize text-primary border-primary",
-                        "transition-colors"
-                    )}
-                />
+            <div className="flex items-center gap-1">
+                <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={handleDecrement}
+                    disabled={value <= min}
+                    aria-label="Decrease value"
+                >
+                    <Minus className="h-3 w-3" />
+                </Button>
+
+                <div className="relative flex-1">
+                    <Input
+                        id={id}
+                        ref={inputRef}
+                        type="text"
+                        inputMode="decimal"
+                        value={localValue}
+                        onChange={handleInputChange}
+                        onBlur={handleBlur}
+                        className={cn(
+                            isDragging && "cursor-ew-resize text-primary border-primary",
+                            "transition-colors text-center"
+                        )}
+                    />
+                </div>
+
+                <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={handleIncrement}
+                    disabled={value >= max}
+                    aria-label="Increase value"
+                >
+                    <Plus className="h-3 w-3" />
+                </Button>
             </div>
         </div>
     );

@@ -143,14 +143,11 @@ const MODIFIERS: Record<string, ModifierFn> = {
 
     'scale': (model, params, ctx, bounds) => {
         const origin: [number, number] = [bounds.width / 2, bounds.height / 2];
-        let sx = 1, sy = 1;
-
-        if (params.uniform) {
-            sx = sy = params.scale || 1;
-        } else {
-            sx = params.x || 1;
-            sy = params.y || 1;
-        }
+        // Backend ignores "uniform" flag logic - it just uses x/y.
+        // Syncing is handled by frontend.
+        // Fallback to 'scale' param for old sketches.
+        const sx = params.x || params.scale || 1;
+        const sy = params.y || params.scale || 1;
 
         Effects.scale(model, sx, sy, origin);
     },
@@ -470,6 +467,10 @@ export class Pipeline {
 
                 if (currentModel) {
                     // Combine models by merging their paths/models
+                    // Bake origins to preserve relative positions
+                    MakerJs.model.originate(currentModel, [0, 0]);
+                    MakerJs.model.originate(model, [0, 0]);
+
                     const combined: MakerJs.IModel = { paths: {}, models: {} };
                     if (currentModel.paths) Object.assign(combined.paths!, currentModel.paths);
                     if (currentModel.models) Object.assign(combined.models!, currentModel.models);

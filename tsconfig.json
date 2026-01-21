@@ -10,7 +10,11 @@
         "rootDir": "./src",
         "resolveJsonModule": true,
         "moduleResolution": "node",
-        "types": ["node"]
+        "jsx": "react-jsx",
+        "types": [
+            "node",
+            "vite/client"
+        ]
     },
     "include": [
         "src/**/*"

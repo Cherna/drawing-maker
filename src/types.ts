@@ -7,7 +7,7 @@ export interface CanvasConfig {
     width: number;
     height: number;
     margin: MarginConfig;
-    strokeWidth?: number; // Visualization line width in mm
+    margin: MarginConfig;
 }
 
 // Mask types - geometric and procedural
@@ -47,6 +47,7 @@ export interface Layer {
     visible: boolean;    // Required: whether layer is visible/rendered
     color: string;       // Hex color code (e.g., "#FF5733")
     opacity?: number;    // Optional: 0-1 for layer transparency
+    strokeWidth?: number; // Optional: stroke width in mm
 }
 
 export interface LayerExportOptions {

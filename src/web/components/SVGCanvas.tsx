@@ -47,17 +47,16 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
       .replace(/width=["'][^"']+mm["']/, `width="${viewBoxDims.width}"`)
       .replace(/height=["'][^"']+mm["']/, `height="${viewBoxDims.height}"`);
 
-    // Apply stroke width override
-    if (strokeWidth !== undefined) {
-      // Replace 'stroke-width="..."' with our value
-      result = result.replace(/stroke-width=["'][^"']*["']/g, `stroke-width="${strokeWidth}"`);
+    // Do not override stroke-width globally anymore.
+    // Layers now handle their own stroke widths.
 
-      // Inject into root svg tag for global default
-      result = result.replace(/<svg /, `<svg stroke-width="${strokeWidth}" `);
+    // Safety check for empty SVGs
+    if (!result.includes('<svg')) {
+      return result;
     }
 
     return result;
-  }, [svg, viewBoxDims, strokeWidth]);
+  }, [svg, viewBoxDims]);
 
   // Measure container size
   useLayoutEffect(() => {

@@ -16,7 +16,7 @@ export default function NestedStepsEditor({ step, stepIndex }: NestedStepsEditor
 
   const handleAddNestedStep = (toolName: string) => {
     const toolDef = TOOL_DEFINITIONS[toolName];
-    
+
     const newParams: any = {};
     if (toolDef) {
       toolDef.params.forEach((param) => {
@@ -52,7 +52,7 @@ export default function NestedStepsEditor({ step, stepIndex }: NestedStepsEditor
   const handleMoveNestedStep = (nestedIndex: number, direction: 'up' | 'down') => {
     const newIndex = direction === 'up' ? nestedIndex - 1 : nestedIndex + 1;
     if (newIndex < 0 || newIndex >= nestedSteps.length) return;
-    
+
     const updatedSteps = [...nestedSteps];
     [updatedSteps[nestedIndex], updatedSteps[newIndex]] = [updatedSteps[newIndex], updatedSteps[nestedIndex]];
     const newStepParams = { ...step.params, steps: updatedSteps };
@@ -67,10 +67,10 @@ export default function NestedStepsEditor({ step, stepIndex }: NestedStepsEditor
       <div className="text-sm font-medium text-muted-foreground">
         {isDuplicate ? 'Modifiers applied to duplicate:' : 'Sub-pipeline steps (applied to duplicate):'}
       </div>
-      
+
       {nestedSteps.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          {isDuplicate 
+          {isDuplicate
             ? 'Add modifiers to transform the duplicated drawing (e.g., scale, rotate).'
             : 'No nested steps. Add modifiers to this layer.'}
         </p>
@@ -91,17 +91,17 @@ export default function NestedStepsEditor({ step, stepIndex }: NestedStepsEditor
           ))}
         </div>
       )}
-      
+
       <Select onValueChange={handleAddNestedStep}>
         <SelectTrigger className="w-full h-8 text-xs">
           <span className="text-muted-foreground">+ Add modifier...</span>
         </SelectTrigger>
         <SelectContent>
           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Modifiers</div>
-          {MODIFIERS.filter(t => 
-            t !== 'layer' && 
-            t !== 'duplicate' && 
-            t !== 'merge' && 
+          {MODIFIERS.filter(t =>
+            t !== 'layer' &&
+            t !== 'duplicate' &&
+            t !== 'merge' &&
             t !== 'clone'
           ).map((tool) => (
             <SelectItem key={tool} value={tool}>
@@ -134,7 +134,7 @@ function NestedStepItem({ step, stepIndex, nestedIndex, onUpdate, onRemove, onMo
   const handleNestedToolChange = (newTool: string) => {
     const toolDef = TOOL_DEFINITIONS[newTool];
     const newParams: any = {};
-    
+
     if (toolDef) {
       toolDef.params.forEach((param) => {
         if (param.default !== undefined) {
@@ -151,7 +151,17 @@ function NestedStepItem({ step, stepIndex, nestedIndex, onUpdate, onRemove, onMo
   };
 
   const handleNestedParamUpdate = (key: string, value: any) => {
-    const updatedStep = { ...step, params: { ...step.params, [key]: value } };
+    // Feature: Sync Scale X/Y if Uniform is checked
+    const newParams = { ...step.params, [key]: value };
+    if (step.tool === 'scale' && newParams.uniform) {
+      if (key === 'x') newParams.y = value;
+      if (key === 'y') newParams.x = value;
+      if (key === 'uniform' && value === true) {
+        newParams.y = newParams.x;
+      }
+    }
+
+    const updatedStep = { ...step, params: newParams };
     const updatedSteps = [...nestedSteps];
     updatedSteps[nestedIndex] = updatedStep;
     const newStepParams = { ...parentStep.params, steps: updatedSteps };
@@ -170,10 +180,10 @@ function NestedStepItem({ step, stepIndex, nestedIndex, onUpdate, onRemove, onMo
               {toolDef?.label || step.tool}
             </SelectTrigger>
             <SelectContent>
-              {MODIFIERS.filter(t => 
-                t !== 'layer' && 
-                t !== 'duplicate' && 
-                t !== 'merge' && 
+              {MODIFIERS.filter(t =>
+                t !== 'layer' &&
+                t !== 'duplicate' &&
+                t !== 'merge' &&
                 t !== 'clone'
               ).map((tool) => (
                 <SelectItem key={tool} value={tool}>
@@ -210,7 +220,7 @@ function NestedStepItem({ step, stepIndex, nestedIndex, onUpdate, onRemove, onMo
             </button>
           </div>
         </div>
-        
+
         {/* Nested step params */}
         {toolDef && toolDef.params.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-border/50">
@@ -218,10 +228,10 @@ function NestedStepItem({ step, stepIndex, nestedIndex, onUpdate, onRemove, onMo
               const value = step.params[paramDef.key] !== undefined
                 ? step.params[paramDef.key]
                 : paramDef.default !== undefined
-                ? paramDef.default
-                : paramDef.type === 'number'
-                ? 0
-                : '';
+                  ? paramDef.default
+                  : paramDef.type === 'number'
+                    ? 0
+                    : '';
 
               if (paramDef.type === 'number') {
                 const hasRange = paramDef.min !== undefined && paramDef.max !== undefined;

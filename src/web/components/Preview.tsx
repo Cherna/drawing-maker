@@ -63,7 +63,7 @@ export default function Preview({ svg, isLoading, error }: PreviewProps) {
         )}
 
         {!isLoading && !error && svg && (
-          <SVGCanvas svg={svg} strokeWidth={strokeWidth} />
+          <SVGCanvas svg={svg} />
         )}
 
         {!isLoading && !error && !svg && (

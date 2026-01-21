@@ -143,8 +143,11 @@ export default function LayerStepItem({
                 // If key is 'mask', update it on the step root
                 if (key === 'mask') {
                   onUpdate(index, { mask: value });
+                } else if (key === 'params') {
+                  // Special case: update entire params object (handling sync logic from child)
+                  onUpdate(index, { params: value });
                 } else {
-                  // Otherwise update params
+                  // Otherwise update single param
                   onUpdate(index, {
                     params: { ...step.params, [key]: value }
                   });
