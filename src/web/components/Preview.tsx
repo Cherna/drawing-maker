@@ -7,10 +7,15 @@ interface PreviewProps {
   error?: Error | null;
 }
 
+import { useConfigStore } from '../store/config-store';
+
 export default function Preview({ svg, isLoading, error }: PreviewProps) {
+  const strokeWidth = useConfigStore((state) => state.config.canvas.strokeWidth);
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-muted/20">
       <div className="border-b border-border bg-card px-6 py-3">
+        {/* ... header content ... */}
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Preview</h2>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -32,9 +37,10 @@ export default function Preview({ svg, isLoading, error }: PreviewProps) {
           </div>
         </div>
       </div>
-      
+
       {/* Main content area - must fill remaining space */}
       <div className="flex-1 relative" style={{ minHeight: 0 }}>
+        {/* ... loading/error states ... */}
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
@@ -43,7 +49,7 @@ export default function Preview({ svg, isLoading, error }: PreviewProps) {
             </div>
           </div>
         )}
-        
+
         {error && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
@@ -55,11 +61,11 @@ export default function Preview({ svg, isLoading, error }: PreviewProps) {
             </div>
           </div>
         )}
-        
+
         {!isLoading && !error && svg && (
-          <SVGCanvas svg={svg} />
+          <SVGCanvas svg={svg} strokeWidth={strokeWidth} />
         )}
-        
+
         {!isLoading && !error && !svg && (
           <div className="absolute inset-0 flex items-center justify-center">
             <p className="text-muted-foreground">Configure your drawing to see preview</p>

@@ -4,7 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import { AppConfig, Layer } from '../types';
 import { PipelineSketch } from '../sketches/pipeline-sketch';
-import { GCodeExporter } from '../core/gcode-exporter';
+import { PipelineSketch } from '../sketches/pipeline-sketch';
+import { generateGCode, generateGCodeForLayers } from '../core/gcode';
 import { modelToSVG, layersToSVG, modelToSVGWithColor } from '../core/svg-exporter';
 import { Pipeline } from '../core/pipeline';
 
@@ -130,7 +131,7 @@ app.post('/api/export', async (req, res) => {
             }
 
             const svg = modelToSVGWithColor(model, config.canvas, layer.color || '#000000', layer.opacity);
-            const gcode = GCodeExporter.export(model, config.gcode);
+            const gcode = generateGCode(model, config, config.gcode.postProcessor || 'standard');
 
             res.json({ svg, gcode, layerName: layer.name });
             return;
@@ -150,7 +151,7 @@ app.post('/api/export', async (req, res) => {
                     if (model) {
                         layerExports[layer.id] = {
                             svg: modelToSVGWithColor(model, config.canvas, layer.color || '#000000', layer.opacity),
-                            gcode: GCodeExporter.export(model, config.gcode),
+                            gcode: generateGCode(model, config, config.gcode.postProcessor || 'standard'),
                             name: layer.name
                         };
                     }
@@ -172,7 +173,7 @@ app.post('/api/export', async (req, res) => {
                 }
 
                 const svg = layersToSVG(layerData, config.canvas);
-                const gcode = GCodeExporter.exportLayers(layerModels, config.gcode);
+                const gcode = generateGCodeForLayers(layerModels, config, config.gcode.postProcessor || 'standard');
 
                 res.json({ svg, gcode });
             }
@@ -181,7 +182,7 @@ app.post('/api/export', async (req, res) => {
             const sketch = new PipelineSketch();
             const model = await sketch.generate(config.canvas, config.params);
             const svg = modelToSVG(model, config.canvas);
-            const gcode = GCodeExporter.export(model, config.gcode);
+            const gcode = generateGCode(model, config, config.gcode.postProcessor || 'standard');
 
             res.json({ svg, gcode });
         }

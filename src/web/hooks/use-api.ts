@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { AppConfig } from '../../types';
 
 // Use relative URLs so Vite's proxy works from any network location
@@ -21,6 +21,7 @@ export function usePreview(config: AppConfig) {
       return response.json();
     },
     enabled: !!config,
+    placeholderData: keepPreviousData,
     staleTime: 0,
     gcTime: 0,
   });

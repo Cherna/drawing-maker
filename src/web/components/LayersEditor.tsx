@@ -464,7 +464,7 @@ export default function LayersEditor() {
         </div>
 
         {/* Add Step */}
-        <Select onValueChange={handleAddStep}>
+        <Select value="" onValueChange={handleAddStep}>
           <SelectTrigger className="w-full h-9 text-sm">
             <span className="text-muted-foreground">
               + Add step...

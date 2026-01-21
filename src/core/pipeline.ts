@@ -5,6 +5,7 @@ import { Effects } from '../lib/effects';
 import { Layout, Box } from '../lib/layout';
 import { Masks } from '../lib/masks';
 import { Transformer } from './transformer';
+import { NoisePatterns, NoiseParams } from '../lib/noise-patterns';
 
 type GeneratorFn = (params: any, ctx: CanvasConfig, bounds: Box) => MakerJs.IModel | Promise<MakerJs.IModel>;
 type ModifierFn = (model: MakerJs.IModel, params: any, ctx: CanvasConfig, bounds: Box, mask?: (x: number, y: number) => number) => Promise<MakerJs.IModel | void> | MakerJs.IModel | void;
@@ -16,12 +17,24 @@ type ModifierFn = (model: MakerJs.IModel, params: any, ctx: CanvasConfig, bounds
 function deepCloneModel(model: MakerJs.IModel): MakerJs.IModel {
     const cloned = MakerJs.cloneObject(model);
 
+    // Deep clone origin if it exists (CRITICAL FIXME: Arrays are objects in JS, cloneObject is shallow)
+    if (model.origin) {
+        cloned.origin = [...model.origin];
+    }
+
     // Ensure paths are deeply cloned
     if (cloned.paths && model.paths) {
         const newPaths: { [key: string]: MakerJs.IPath } = {};
         for (const key in model.paths) {
             if (model.paths.hasOwnProperty(key)) {
                 newPaths[key] = MakerJs.cloneObject(model.paths[key]);
+                // Paths also have 'origin', 'end' etc which are arrays. 
+                // cloneObject shallow copies them.
+                // We should probably deep clone paths too if we move points individually.
+                // But MakerJs.model.move usually updates origin or point coordinates.
+                // If it updates point coordinates, we need deep copies of points.
+                if (newPaths[key].origin) newPaths[key].origin = [...(model.paths[key].origin as number[])];
+                if ((newPaths[key] as any).end) (newPaths[key] as any).end = [...((model.paths[key] as any).end as number[])];
             }
         }
         cloned.paths = newPaths;
@@ -130,7 +143,16 @@ const MODIFIERS: Record<string, ModifierFn> = {
 
     'scale': (model, params, ctx, bounds) => {
         const origin: [number, number] = [bounds.width / 2, bounds.height / 2];
-        Effects.scale(model, params.x || params.scale || 1, params.y, origin);
+        let sx = 1, sy = 1;
+
+        if (params.uniform) {
+            sx = sy = params.scale || 1;
+        } else {
+            sx = params.x || 1;
+            sy = params.y || 1;
+        }
+
+        Effects.scale(model, sx, sy, origin);
     },
 
     'simplify': (model, params) => {
@@ -148,33 +170,39 @@ const MODIFIERS: Record<string, ModifierFn> = {
 
     'mirror': (model, params, ctx, bounds) => {
         const axis = params.axis || 'x';
+        // User feedback: "Mirror X" implies mirroring horizontally (across Y axis)
         const normX = axis === 'x';
         const normY = axis === 'y';
 
+        let cx, cy;
+
         if (params.center) {
-            // Mirror relative to model center (move to origin, mirror, move back)
+            // Mirror relative to model center (Flip in place)
             const extents = MakerJs.measure.modelExtents(model);
-            const cx = (extents.low[0] + extents.high[0]) / 2;
-            const cy = (extents.low[1] + extents.high[1]) / 2;
-            MakerJs.model.move(model, [-cx, -cy]);
-            MakerJs.model.mirror(model, normX, normY);
-            MakerJs.model.move(model, [cx, cy]);
+            cx = (extents.low[0] + extents.high[0]) / 2;
+            cy = (extents.low[1] + extents.high[1]) / 2;
         } else {
-            // Absolute mirror (flips coordinate)
-            MakerJs.model.mirror(model, normX, normY);
+            // Mirror relative to Canvas/Window Center
+            // This allows mirroring something from left to right side of page
+            cx = bounds.width / 2;
+            cy = bounds.height / 2;
         }
+
+        MakerJs.model.move(model, [-cx, -cy]);
+        MakerJs.model.mirror(model, normX, normY);
+        MakerJs.model.move(model, [cx, cy]);
     },
 
     'array': (model, params, ctx, bounds) => {
-        const count = Math.max(1, Math.floor(params.count || 2));
-        const x = params.x || 0;
-        const y = params.y || 0;
+        const count = Math.max(1, Math.floor(Number(params.count) || 2));
+        const offX = Number(params.x) || 0;
+        const offY = Number(params.y) || 0;
 
         const result: MakerJs.IModel = { models: {} };
 
         for (let i = 0; i < count; i++) {
             const clone = deepCloneModel(model);
-            MakerJs.model.move(clone, [x * i, y * i]);
+            MakerJs.model.move(clone, [offX * i, offY * i]);
             result.models![`array_${i}`] = clone;
         }
 
@@ -182,69 +210,95 @@ const MODIFIERS: Record<string, ModifierFn> = {
     },
 
     'warp': (model, params, ctx, bounds, mask) => {
-        // Custom warp using parametric function
-        // params.type: 'bulge', 'pinch', 'twist', 'wave'
         const type = params.type || 'bulge';
-        const strength = params.strength || 10;
+        const strength = Number(params.strength) || 10;
         const cx = bounds.width / 2;
         const cy = bounds.height / 2;
 
         let warpFn: (x: number, y: number) => { dx: number, dy: number };
 
-        switch (type) {
-            case 'bulge':
-                // Pushes outward from center
-                warpFn = (x, y) => {
-                    const dx = x - cx;
-                    const dy = y - cy;
-                    const dist = Math.hypot(dx, dy);
-                    const maxDist = Math.hypot(cx, cy);
-                    const factor = 1 - (dist / maxDist);
-                    return {
-                        dx: (dx / (dist || 1)) * factor * strength,
-                        dy: (dy / (dist || 1)) * factor * strength
+        // Check if it's a noise type
+        if (['simplex', 'perlin', 'turbulence', 'marble', 'cells'].includes(type) || type === 'noise') {
+            const noiseType = type === 'noise' ? 'simplex' : type;
+            const patterns = new NoisePatterns(params.seed || Date.now());
+            const noiseParams: NoiseParams = {
+                scale: params.frequency || params.scale || 0.05, // Map frequency to scale for noise
+                octaves: params.octaves || 1,
+                persistence: params.persistence || 0.5,
+                lacunarity: params.lacunarity || 2,
+                distortion: params.distortion,
+            };
+
+            warpFn = (x, y) => {
+                const nx = patterns.get(noiseType as any, x, y, noiseParams);
+                // For Y displacement, sample from a different location to avoid correlated movement
+                const ny = patterns.get(noiseType as any, x + 1000, y + 1000, noiseParams);
+
+                // Map 0..1 to -0.5..0.5 then scale
+                return {
+                    dx: (nx - 0.5) * strength,
+                    dy: (ny - 0.5) * strength
+                };
+            };
+        } else {
+            // Geometric warps
+            switch (type) {
+                case 'bulge':
+                    warpFn = (x, y) => {
+                        const dx = x - cx;
+                        const dy = y - cy;
+                        const dist = Math.hypot(dx, dy);
+                        const maxDist = Math.hypot(cx, cy);
+                        const factor = 1 - (dist / maxDist);
+                        return {
+                            dx: (dx / (dist || 1)) * factor * strength,
+                            dy: (dy / (dist || 1)) * factor * strength
+                        };
                     };
-                };
-                break;
-            case 'pinch':
-                // Pulls toward center
-                warpFn = (x, y) => {
-                    const dx = x - cx;
-                    const dy = y - cy;
-                    const dist = Math.hypot(dx, dy);
-                    const maxDist = Math.hypot(cx, cy);
-                    const factor = dist / maxDist;
-                    return {
-                        dx: -(dx / (dist || 1)) * factor * strength,
-                        dy: -(dy / (dist || 1)) * factor * strength
+                    break;
+                case 'pinch':
+                    // Pulls toward center. 
+                    // To pinch effectively, we need to move points *towards* center.
+                    // dx should be negative of relative position.
+                    warpFn = (x, y) => {
+                        const dx = x - cx;
+                        const dy = y - cy;
+                        const dist = Math.hypot(dx, dy);
+                        const maxDist = Math.hypot(cx, cy); // Normalize by canvas size
+                        // Strength should decay with distance? or increase?
+                        // Pinch usually means center is sucked in.
+                        // Let's try exponential falloff
+                        const factor = Math.exp(-dist * 0.01) * (strength / 10);
+                        return {
+                            dx: -dx * factor,
+                            dy: -dy * factor
+                        };
                     };
-                };
-                break;
-            case 'twist':
-                // Rotates around center, more at edges
-                warpFn = (x, y) => {
-                    const dx = x - cx;
-                    const dy = y - cy;
-                    const dist = Math.hypot(dx, dy);
-                    const maxDist = Math.hypot(cx, cy);
-                    const angle = (dist / maxDist) * (strength * Math.PI / 180);
-                    const cos = Math.cos(angle);
-                    const sin = Math.sin(angle);
-                    const newDx = dx * cos - dy * sin;
-                    const newDy = dx * sin + dy * cos;
-                    return { dx: newDx - dx, dy: newDy - dy };
-                };
-                break;
-            case 'wave':
-                // Sinusoidal displacement
-                const freq = params.frequency || 0.05;
-                warpFn = (x, y) => ({
-                    dx: Math.sin(y * freq * Math.PI * 2) * strength,
-                    dy: Math.sin(x * freq * Math.PI * 2) * strength * (params.vertical ? 1 : 0)
-                });
-                break;
-            default:
-                warpFn = () => ({ dx: 0, dy: 0 });
+                    break;
+                case 'twist':
+                    warpFn = (x, y) => {
+                        const dx = x - cx;
+                        const dy = y - cy;
+                        const dist = Math.hypot(dx, dy);
+                        const maxDist = Math.hypot(cx, cy);
+                        const angle = (dist / maxDist) * (strength * Math.PI / 180);
+                        const cos = Math.cos(angle);
+                        const sin = Math.sin(angle);
+                        const newDx = dx * cos - dy * sin;
+                        const newDy = dx * sin + dy * cos;
+                        return { dx: newDx - dx, dy: newDy - dy };
+                    };
+                    break;
+                case 'wave':
+                    const freq = params.frequency || 0.05;
+                    warpFn = (x, y) => ({
+                        dx: Math.sin(y * freq * Math.PI * 2) * strength,
+                        dy: Math.sin(x * freq * Math.PI * 2) * strength * (params.vertical ? 1 : 0)
+                    });
+                    break;
+                default:
+                    warpFn = () => ({ dx: 0, dy: 0 });
+            }
         }
 
         Effects.warp(model, warpFn, mask);
@@ -454,30 +508,25 @@ export class Pipeline {
             return { models: {} };
         }
 
-        // Get the bounding box of the model
-        const modelExtents = MakerJs.measure.modelExtents(currentModel);
-        const modelWidth = modelExtents.high[0] - modelExtents.low[0];
-        const modelHeight = modelExtents.high[1] - modelExtents.low[1];
-        const modelCenterX = (modelExtents.low[0] + modelExtents.high[0]) / 2;
-        const modelCenterY = (modelExtents.low[1] + modelExtents.high[1]) / 2;
+        if (currentModel) {
+            // Center the model
+            const modelExtents = MakerJs.measure.modelExtents(currentModel);
+            if (modelExtents) {
+                const modelCenterX = (modelExtents.low[0] + modelExtents.high[0]) / 2;
+                const modelCenterY = (modelExtents.low[1] + modelExtents.high[1]) / 2;
 
-        // Calculate scale to fit within draw area (maintaining aspect ratio)
-        const padding = 0.98;
-        const scaleX = (bounds.width * padding) / modelWidth;
-        const scaleY = (bounds.height * padding) / modelHeight;
-        const scale = Math.min(scaleX, scaleY, 1.0);
+                const drawCenterX = bounds.x + bounds.width / 2;
+                const drawCenterY = bounds.y + bounds.height / 2;
 
-        // Center of draw area (in canvas coordinates)
-        const drawCenterX = bounds.x + bounds.width / 2;
-        const drawCenterY = bounds.y + bounds.height / 2;
+                MakerJs.model.move(currentModel, [
+                    drawCenterX - modelCenterX,
+                    drawCenterY - modelCenterY
+                ]);
+            }
+            return currentModel;
+        }
 
-        // Transform all paths: scale and center the model
-        Transformer.displace(currentModel, (x, y) => ({
-            x: (x - modelCenterX) * scale + drawCenterX,
-            y: (y - modelCenterY) * scale + drawCenterY
-        }));
-
-        return currentModel;
+        return { models: {} };
     }
 
     /**
@@ -561,30 +610,23 @@ export class Pipeline {
                 console.warn(`  Pipeline Warning: Unknown tool '${step.tool}' in layer '${layer.name}'`);
             }
 
-            // If layer produced a model, center and scale it
-            if (currentModel && (currentModel.paths || currentModel.models)) {
-                // Get the bounding box of the model
+            if (currentModel) {
+                // Center the model in the draw area (without scaling)
+                // This ensures that if a generator creates a model at 0,0, and we want it in the center of the page,
+                // it gets moved there.
                 const modelExtents = MakerJs.measure.modelExtents(currentModel);
-                const modelWidth = modelExtents.high[0] - modelExtents.low[0];
-                const modelHeight = modelExtents.high[1] - modelExtents.low[1];
-                const modelCenterX = (modelExtents.low[0] + modelExtents.high[0]) / 2;
-                const modelCenterY = (modelExtents.low[1] + modelExtents.high[1]) / 2;
+                if (modelExtents) {
+                    const modelCenterX = (modelExtents.low[0] + modelExtents.high[0]) / 2;
+                    const modelCenterY = (modelExtents.low[1] + modelExtents.high[1]) / 2;
 
-                // Calculate scale to fit within draw area (maintaining aspect ratio)
-                const padding = 0.98;
-                const scaleX = (bounds.width * padding) / modelWidth;
-                const scaleY = (bounds.height * padding) / modelHeight;
-                const scale = Math.min(scaleX, scaleY, 1.0);
+                    const drawCenterX = bounds.x + bounds.width / 2;
+                    const drawCenterY = bounds.y + bounds.height / 2;
 
-                // Center of draw area (in canvas coordinates)
-                const drawCenterX = bounds.x + bounds.width / 2;
-                const drawCenterY = bounds.y + bounds.height / 2;
-
-                // Transform all paths: scale and center the model
-                Transformer.displace(currentModel, (x, y) => ({
-                    x: (x - modelCenterX) * scale + drawCenterX,
-                    y: (y - modelCenterY) * scale + drawCenterY
-                }));
+                    MakerJs.model.move(currentModel, [
+                        drawCenterX - modelCenterX,
+                        drawCenterY - modelCenterY
+                    ]);
+                }
 
                 result.set(layer.id, currentModel);
             }

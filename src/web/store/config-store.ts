@@ -5,30 +5,27 @@ const defaultConfig: AppConfig = {
   sketch: 'pipeline',
   outputBaseName: 'drawing',
   canvas: {
-    width: 300,
-    height: 200,
-    margin: 20,
+    height: 297,
+    width: 420,
+    margin: 60,
+    strokeWidth: 0.7,
   },
   gcode: {
     feedRate: 2000,
     zUp: 5,
     zDown: 0,
+    postProcessor: 'standard',
   },
   params: {
     seed: Math.floor(Math.random() * 10000),
-    steps: [
-      { tool: 'stripes', params: { lines: 100 } },
-      { tool: 'resample', params: { res: 1.0 } },
-      { tool: 'noise', params: { scale: 0.05, magnitude: 5 } },
-    ],
     layers: [
       {
         id: 'base',
         name: 'Base Layer',
         steps: [
           { tool: 'stripes', params: { lines: 100 } },
-          { tool: 'resample', params: { res: 1.0 } },
-          { tool: 'noise', params: { scale: 0.05, magnitude: 5 } },
+          { tool: 'resample', params: { detail: 1.0 } },
+          { tool: 'move', params: { x: 0, y: 0 } },
         ],
         visible: true,
         color: '#000000'
@@ -44,10 +41,7 @@ interface ConfigStore {
   updateCanvas: (updates: Partial<AppConfig['canvas']>) => void;
   updateGCode: (updates: Partial<AppConfig['gcode']>) => void;
   updateParams: (updates: Partial<AppConfig['params']>) => void;
-  addStep: (step: PipelineStep, index?: number) => void;
-  updateStep: (index: number, updates: Partial<PipelineStep>) => void;
-  removeStep: (index: number) => void;
-  moveStep: (fromIndex: number, toIndex: number) => void;
+
   setConfig: (config: AppConfig) => void;
   reset: () => void;
 }
@@ -79,55 +73,6 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         params: { ...state.config.params, ...updates },
       },
     })),
-  addStep: (step, index) =>
-    set((state) => {
-      const steps = [...(state.config.params.steps || [])];
-      if (index !== undefined) {
-        steps.splice(index, 0, step);
-      } else {
-        steps.push(step);
-      }
-      return {
-        config: {
-          ...state.config,
-          params: { ...state.config.params, steps },
-        },
-      };
-    }),
-  updateStep: (index, updates) =>
-    set((state) => {
-      const steps = [...(state.config.params.steps || [])];
-      steps[index] = { ...steps[index], ...updates };
-      return {
-        config: {
-          ...state.config,
-          params: { ...state.config.params, steps },
-        },
-      };
-    }),
-  removeStep: (index) =>
-    set((state) => {
-      const steps = [...(state.config.params.steps || [])];
-      steps.splice(index, 1);
-      return {
-        config: {
-          ...state.config,
-          params: { ...state.config.params, steps },
-        },
-      };
-    }),
-  moveStep: (fromIndex, toIndex) =>
-    set((state) => {
-      const steps = [...(state.config.params.steps || [])];
-      const [removed] = steps.splice(fromIndex, 1);
-      steps.splice(toIndex, 0, removed);
-      return {
-        config: {
-          ...state.config,
-          params: { ...state.config.params, steps },
-        },
-      };
-    }),
   setConfig: (config) => set({ config }),
   reset: () => set({ config: defaultConfig }),
 }));

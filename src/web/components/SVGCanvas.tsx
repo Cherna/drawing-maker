@@ -4,9 +4,10 @@ import { Button } from './ui/button';
 
 interface SVGCanvasProps {
   svg?: string;
+  strokeWidth?: number;
 }
 
-export default function SVGCanvas({ svg }: SVGCanvasProps) {
+export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -16,7 +17,7 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const MIN_ZOOM = 0.1;
-  const MAX_ZOOM = 20; // Increased from 5 to allow up to 2000% zoom
+  const MAX_ZOOM = 20;
 
   // Extract viewBox dimensions (the logical coordinate space)
   const viewBoxDims = useMemo(() => {
@@ -46,8 +47,17 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
       .replace(/width=["'][^"']+mm["']/, `width="${viewBoxDims.width}"`)
       .replace(/height=["'][^"']+mm["']/, `height="${viewBoxDims.height}"`);
 
+    // Apply stroke width override
+    if (strokeWidth !== undefined) {
+      // Replace 'stroke-width="..."' with our value
+      result = result.replace(/stroke-width=["'][^"']*["']/g, `stroke-width="${strokeWidth}"`);
+
+      // Inject into root svg tag for global default
+      result = result.replace(/<svg /, `<svg stroke-width="${strokeWidth}" `);
+    }
+
     return result;
-  }, [svg, viewBoxDims]);
+  }, [svg, viewBoxDims, strokeWidth]);
 
   // Measure container size
   useLayoutEffect(() => {
@@ -72,8 +82,15 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
   }, []);
 
   // Calculate fit when SVG or container size changes
+  const hasFitted = useRef(false);
+
+  // We need to compare specific dimensions to avoid re-triggering on object identity changes
+  const dimsStr = viewBoxDims ? `${viewBoxDims.width},${viewBoxDims.height}` : '';
+
   useEffect(() => {
     if (!viewBoxDims || containerSize.width === 0 || containerSize.height === 0) return;
+
+    if (hasFitted.current) return;
 
     const padding = 60;
     const availableWidth = containerSize.width - padding * 2;
@@ -83,11 +100,12 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
 
     const scaleX = availableWidth / viewBoxDims.width;
     const scaleY = availableHeight / viewBoxDims.height;
-    const newScale = Math.min(scaleX, scaleY); // Scale to fit, allow scaling up
+    const newScale = Math.min(scaleX, scaleY);
 
     setScale(newScale);
     setOffset({ x: 0, y: 0 });
-  }, [svg, containerSize, viewBoxDims]);
+    hasFitted.current = true;
+  }, [dimsStr, containerSize.width, containerSize.height]);
 
   // Use refs for high-frequency updates to avoid re-renders
   const transformRef = useRef({ scale: 1, x: 0, y: 0 });
@@ -153,9 +171,6 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
       transformRef.current.x = newX;
       transformRef.current.y = newY;
       updateTransform();
-
-      // We don't necessarily need to update React state for every mouse move frame if we don't use it elsewhere
-      // But we do need it for the 'isPanning' logic consistency if we pause
     }
   }, [isPanning, panStart]);
 
@@ -186,7 +201,7 @@ export default function SVGCanvas({ svg }: SVGCanvasProps) {
 
     const scaleX = availableWidth / viewBoxDims.width;
     const scaleY = availableHeight / viewBoxDims.height;
-    const newScale = Math.min(scaleX, scaleY); // Scale to fit, allow scaling up
+    const newScale = Math.min(scaleX, scaleY);
 
     setScale(newScale);
     setOffset({ x: 0, y: 0 });

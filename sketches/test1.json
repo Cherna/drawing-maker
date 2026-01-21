@@ -1,0 +1,245 @@
+{
+  "sketch": "pipeline",
+  "outputBaseName": "drawing",
+  "canvas": {
+    "width": 420,
+    "height": 297,
+    "margin": [
+      60,
+      60,
+      60,
+      60
+    ]
+  },
+  "gcode": {
+    "feedRate": 2000,
+    "zUp": 5,
+    "zDown": 0
+  },
+  "params": {
+    "seed": 3561,
+    "steps": [
+      {
+        "tool": "stripes",
+        "params": {
+          "lines": 100
+        }
+      },
+      {
+        "tool": "resample",
+        "params": {
+          "detail": 1
+        }
+      },
+      {
+        "tool": "move",
+        "params": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "tool": "trim",
+        "params": {
+          "threshold": 0.5
+        },
+        "mask": {
+          "type": "perlin",
+          "params": {
+            "seed": 402,
+            "scale": 0.05,
+            "octaves": 1,
+            "persistence": 0.5,
+            "lacunarity": 2
+          },
+          "contrast": 1.2
+        }
+      },
+      {
+        "tool": "trim",
+        "params": {
+          "threshold": 0.5
+        },
+        "mask": {
+          "type": "linear",
+          "params": {
+            "seed": 28
+          },
+          "contrast": 2.8
+        }
+      },
+      {
+        "tool": "duplicate",
+        "params": {
+          "id": "layer_1"
+        }
+      },
+      {
+        "tool": "stripes",
+        "params": {
+          "lines": 100
+        }
+      },
+      {
+        "tool": "resample",
+        "params": {
+          "detail": 1
+        }
+      },
+      {
+        "tool": "trim",
+        "params": {
+          "threshold": 0.5
+        },
+        "mask": {
+          "type": "perlin",
+          "params": {
+            "seed": 402,
+            "scale": 0.049,
+            "octaves": 1,
+            "persistence": 0.5,
+            "lacunarity": 2
+          },
+          "contrast": 1.2
+        }
+      },
+      {
+        "tool": "trim",
+        "params": {
+          "threshold": 0.5
+        },
+        "mask": {
+          "type": "linear",
+          "params": {
+            "seed": 28
+          },
+          "contrast": 2.4
+        },
+        "enabled": true
+      },
+      {
+        "tool": "rotate",
+        "params": {
+          "rotation": 2
+        }
+      }
+    ],
+    "layers": [
+      {
+        "id": "base",
+        "name": "Base Layer",
+        "steps": [
+          {
+            "tool": "stripes",
+            "params": {
+              "lines": 100
+            }
+          },
+          {
+            "tool": "resample",
+            "params": {
+              "detail": 1
+            }
+          },
+          {
+            "tool": "move",
+            "params": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "tool": "trim",
+            "params": {
+              "threshold": 0.5
+            },
+            "mask": {
+              "type": "perlin",
+              "params": {
+                "seed": 402,
+                "scale": 0.05,
+                "octaves": 1,
+                "persistence": 0.5,
+                "lacunarity": 2
+              },
+              "contrast": 1.2
+            }
+          },
+          {
+            "tool": "trim",
+            "params": {
+              "threshold": 0.5
+            },
+            "mask": {
+              "type": "linear",
+              "params": {
+                "seed": 28
+              },
+              "contrast": 2.8
+            }
+          }
+        ],
+        "visible": true,
+        "color": "#000000"
+      },
+      {
+        "id": "layer_1",
+        "name": "Base Layer Copy",
+        "steps": [
+          {
+            "tool": "stripes",
+            "params": {
+              "lines": 100
+            }
+          },
+          {
+            "tool": "resample",
+            "params": {
+              "detail": 1
+            }
+          },
+          {
+            "tool": "trim",
+            "params": {
+              "threshold": 0.5
+            },
+            "mask": {
+              "type": "perlin",
+              "params": {
+                "seed": 402,
+                "scale": 0.049,
+                "octaves": 1,
+                "persistence": 0.5,
+                "lacunarity": 2
+              },
+              "contrast": 1.2
+            }
+          },
+          {
+            "tool": "trim",
+            "params": {
+              "threshold": 0.5
+            },
+            "mask": {
+              "type": "linear",
+              "params": {
+                "seed": 28
+              },
+              "contrast": 2.4
+            },
+            "enabled": true
+          },
+          {
+            "tool": "rotate",
+            "params": {
+              "rotation": 2
+            }
+          }
+        ],
+        "visible": true,
+        "color": "#000000"
+      }
+    ],
+    "activeLayerId": "layer_1"
+  }
+}

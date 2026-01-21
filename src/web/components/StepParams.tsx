@@ -8,6 +8,7 @@ import ScrubbableInput from './ui/scrubbable-input';
 import { PipelineStep } from '../../types';
 import { TOOL_DEFINITIONS } from '../lib/tool-definitions';
 import MaskEditor from './MaskEditor';
+import MaskPreview from './MaskPreview';
 
 interface StepParamsProps {
   step: PipelineStep;
@@ -43,6 +44,10 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
               : paramDef.type === 'boolean'
                 ? false
                 : '';
+
+        if (paramDef.showIf && !paramDef.showIf(step.params)) {
+          return null;
+        }
 
         if (paramDef.type === 'boolean') {
           return (
@@ -110,6 +115,26 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
           </div>
         );
       })}
+
+      {/* Warp Preview */}
+      {step.tool === 'warp' && ['simplex', 'perlin', 'turbulence', 'marble', 'cells'].includes(step.params.type) && (
+        <div className="pt-2">
+          <Label className="text-xs mb-1 block text-muted-foreground">Pattern Preview</Label>
+          <MaskPreview
+            mask={{
+              type: step.params.type,
+              params: {
+                scale: step.params.frequency || step.params.scale || 0.05,
+                octaves: step.params.octaves,
+                persistence: step.params.persistence,
+                lacunarity: step.params.lacunarity,
+                distortion: step.params.distortion,
+                seed: step.params.seed,
+              }
+            }}
+          />
+        </div>
+      )}
 
       {toolDef.hasMask && (
         <MaskEditor

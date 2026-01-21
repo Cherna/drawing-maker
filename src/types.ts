@@ -7,6 +7,7 @@ export interface CanvasConfig {
     width: number;
     height: number;
     margin: MarginConfig;
+    strokeWidth?: number; // Visualization line width in mm
 }
 
 // Mask types - geometric and procedural
@@ -28,7 +29,10 @@ export interface MaskConfig {
     params: any;
     invert?: boolean;
     // Post-processing
+    // Post-processing
     threshold?: number;      // Convert to hard edge at this value (0-1)
+    contrast?: number;       // Contrast (scaling centers on 0.5)
+    brightness?: number;     // Brightness (shift values up/down)
     remap?: [number, number]; // Remap output range [min, max]
     // Combining masks
     op?: MaskOp;             // How to combine with previous mask (default: multiply)
@@ -61,7 +65,7 @@ export interface PipelineStep {
 }
 
 export interface PipelineParams {
-    steps: PipelineStep[];        // Flattened steps for backward compatibility
+    steps?: PipelineStep[];        // Flattened steps for backward compatibility
     seed?: number;                // Global seed for reproducibility
     layers?: Layer[];             // Array of layer objects (new layer system)
     activeLayerId?: string;       // Currently selected layer in UI
@@ -71,6 +75,10 @@ export interface GCodeConfig {
     feedRate: number;
     zUp: number;
     zDown: number;
+    postProcessor?: 'standard' | 'linuxcnc' | 'reprap';
+    useArcs?: boolean;           // Use G2/G3 for circular paths (default: false)
+    optimizePaths?: boolean;      // Sort paths to minimize travel (default: false)
+    dwellTime?: number;          // Pause in ms after Z-down (default: 0)
 }
 
 export interface SketchGenerator {

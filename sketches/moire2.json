@@ -1,0 +1,149 @@
+{
+  "sketch": "pipeline",
+  "outputBaseName": "drawing",
+  "canvas": {
+    "width": 300,
+    "height": 200,
+    "margin": [
+      50,
+      50,
+      50,
+      50
+    ]
+  },
+  "gcode": {
+    "feedRate": 2000,
+    "zUp": 5,
+    "zDown": 0
+  },
+  "params": {
+    "seed": 1804,
+    "steps": [
+      {
+        "tool": "stripes",
+        "params": {
+          "lines": 100
+        }
+      },
+      {
+        "tool": "resample",
+        "params": {
+          "res": 1
+        }
+      },
+      {
+        "tool": "warp",
+        "params": {
+          "type": "perlin",
+          "strength": 6.7,
+          "frequency": 0.019,
+          "octaves": 1,
+          "persistence": 1,
+          "lacunarity": 2,
+          "distortion": 0,
+          "seed": 3
+        }
+      },
+      {
+        "tool": "duplicate",
+        "params": {
+          "id": "layer_1"
+        }
+      },
+      {
+        "tool": "stripes",
+        "params": {
+          "lines": 100
+        }
+      },
+      {
+        "tool": "resample",
+        "params": {
+          "res": 1
+        }
+      },
+      {
+        "tool": "warp",
+        "params": {
+          "type": "perlin",
+          "strength": 10.2,
+          "frequency": 0.014,
+          "octaves": 1,
+          "persistence": 1,
+          "lacunarity": 2,
+          "distortion": 0,
+          "seed": 13
+        }
+      }
+    ],
+    "layers": [
+      {
+        "id": "base",
+        "name": "Base Layer",
+        "steps": [
+          {
+            "tool": "stripes",
+            "params": {
+              "lines": 100
+            }
+          },
+          {
+            "tool": "resample",
+            "params": {
+              "res": 1
+            }
+          },
+          {
+            "tool": "warp",
+            "params": {
+              "type": "perlin",
+              "strength": 6.7,
+              "frequency": 0.019,
+              "octaves": 1,
+              "persistence": 1,
+              "lacunarity": 2,
+              "distortion": 0,
+              "seed": 3
+            }
+          }
+        ],
+        "visible": true,
+        "color": "#000000"
+      },
+      {
+        "id": "layer_1",
+        "name": "Base Layer Copy",
+        "steps": [
+          {
+            "tool": "stripes",
+            "params": {
+              "lines": 100
+            }
+          },
+          {
+            "tool": "resample",
+            "params": {
+              "res": 1
+            }
+          },
+          {
+            "tool": "warp",
+            "params": {
+              "type": "perlin",
+              "strength": 10.2,
+              "frequency": 0.014,
+              "octaves": 1,
+              "persistence": 1,
+              "lacunarity": 2,
+              "distortion": 0,
+              "seed": 13
+            }
+          }
+        ],
+        "visible": true,
+        "color": "#000000"
+      }
+    ],
+    "activeLayerId": "layer_1"
+  }
+}

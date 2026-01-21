@@ -14,26 +14,31 @@ export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string 
     // So we flip Y: svg_y = canvasHeight - model_y
     const canvasHeight = canvas.height;
 
-    function processPath(path: MakerJs.IPath) {
+    function processPath(path: MakerJs.IPath, offsetX: number = 0, offsetY: number = 0) {
         if (path.type === 'line') {
             const line = path as MakerJs.IPathLine;
-            const x1 = line.origin[0].toFixed(3);
-            const y1 = (canvasHeight - line.origin[1]).toFixed(3);
-            const x2 = line.end[0].toFixed(3);
-            const y2 = (canvasHeight - line.end[1]).toFixed(3);
+            const x1 = (line.origin[0] + offsetX).toFixed(3);
+            const y1 = (canvasHeight - (line.origin[1] + offsetY)).toFixed(3);
+            const x2 = (line.end[0] + offsetX).toFixed(3);
+            const y2 = (canvasHeight - (line.end[1] + offsetY)).toFixed(3);
             lines.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
         }
     }
 
-    function walkModel(m: MakerJs.IModel) {
+    function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
+        // Account for model's origin if it has one
+        const modelOrigin = m.origin || [0, 0];
+        const newOffsetX = offsetX + modelOrigin[0];
+        const newOffsetY = offsetY + modelOrigin[1];
+
         if (m.paths) {
             for (const p of Object.values(m.paths)) {
-                processPath(p);
+                processPath(p, newOffsetX, newOffsetY);
             }
         }
         if (m.models) {
             for (const child of Object.values(m.models)) {
-                walkModel(child);
+                walkModel(child, newOffsetX, newOffsetY);
             }
         }
     }
@@ -66,26 +71,30 @@ export function modelToSVGWithColor(
     const lines: string[] = [];
     const canvasHeight = canvas.height;
 
-    function processPath(path: MakerJs.IPath) {
+    function processPath(path: MakerJs.IPath, offsetX: number = 0, offsetY: number = 0) {
         if (path.type === 'line') {
             const line = path as MakerJs.IPathLine;
-            const x1 = line.origin[0].toFixed(3);
-            const y1 = (canvasHeight - line.origin[1]).toFixed(3);
-            const x2 = line.end[0].toFixed(3);
-            const y2 = (canvasHeight - line.end[1]).toFixed(3);
+            const x1 = (line.origin[0] + offsetX).toFixed(3);
+            const y1 = (canvasHeight - (line.origin[1] + offsetY)).toFixed(3);
+            const x2 = (line.end[0] + offsetX).toFixed(3);
+            const y2 = (canvasHeight - (line.end[1] + offsetY)).toFixed(3);
             lines.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
         }
     }
 
-    function walkModel(m: MakerJs.IModel) {
+    function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
+        const modelOrigin = m.origin || [0, 0];
+        const newOffsetX = offsetX + modelOrigin[0];
+        const newOffsetY = offsetY + modelOrigin[1];
+
         if (m.paths) {
             for (const p of Object.values(m.paths)) {
-                processPath(p);
+                processPath(p, newOffsetX, newOffsetY);
             }
         }
         if (m.models) {
             for (const child of Object.values(m.models)) {
-                walkModel(child);
+                walkModel(child, newOffsetX, newOffsetY);
             }
         }
     }
@@ -127,26 +136,30 @@ export function layersToSVG(
         const lines: string[] = [];
         const { model, color, opacity = 1.0 } = data;
 
-        function processPath(path: MakerJs.IPath) {
+        function processPath(path: MakerJs.IPath, offsetX: number = 0, offsetY: number = 0) {
             if (path.type === 'line') {
                 const line = path as MakerJs.IPathLine;
-                const x1 = line.origin[0].toFixed(3);
-                const y1 = (canvasHeight - line.origin[1]).toFixed(3);
-                const x2 = line.end[0].toFixed(3);
-                const y2 = (canvasHeight - line.end[1]).toFixed(3);
+                const x1 = (line.origin[0] + offsetX).toFixed(3);
+                const y1 = (canvasHeight - (line.origin[1] + offsetY)).toFixed(3);
+                const x2 = (line.end[0] + offsetX).toFixed(3);
+                const y2 = (canvasHeight - (line.end[1] + offsetY)).toFixed(3);
                 lines.push(`    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
             }
         }
 
-        function walkModel(m: MakerJs.IModel) {
+        function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
+            const modelOrigin = m.origin || [0, 0];
+            const newOffsetX = offsetX + modelOrigin[0];
+            const newOffsetY = offsetY + modelOrigin[1];
+
             if (m.paths) {
                 for (const p of Object.values(m.paths)) {
-                    processPath(p);
+                    processPath(p, newOffsetX, newOffsetY);
                 }
             }
             if (m.models) {
                 for (const child of Object.values(m.models)) {
-                    walkModel(child);
+                    walkModel(child, newOffsetX, newOffsetY);
                 }
             }
         }

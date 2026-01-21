@@ -7,6 +7,7 @@ export interface ToolParamDef {
   step?: number;
   default?: any;
   options?: string[];
+  showIf?: (params: any) => boolean;
 }
 
 export interface ToolDefinition {
@@ -14,6 +15,7 @@ export interface ToolDefinition {
   label: string;
   params: ToolParamDef[];
   hasMask?: boolean;
+  deprecated?: boolean;
 }
 
 export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
@@ -116,8 +118,9 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
   },
   'noise': {
     category: 'modifier',
-    label: 'Noise',
+    label: 'Noise (Legacy)',
     hasMask: true,
+    deprecated: true,
     params: [
       { key: 'scale', label: 'Scale', type: 'number', min: 0.001, max: 0.5, step: 0.001, default: 0.05 },
       { key: 'magnitude', label: 'Magnitude', type: 'number', min: 0, max: 50, step: 0.1, default: 5 },
@@ -141,9 +144,10 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     category: 'modifier',
     label: 'Scale',
     params: [
+      { key: 'uniform', label: 'Uniform', type: 'boolean', default: true },
       { key: 'scale', label: 'Scale', type: 'number', min: 0.1, max: 5, step: 0.01, default: 1 },
-      { key: 'x', label: 'Scale X', type: 'number', min: 0.1, max: 5, step: 0.01 },
-      { key: 'y', label: 'Scale Y', type: 'number', min: 0.1, max: 5, step: 0.01 },
+      { key: 'x', label: 'Scale X', type: 'number', min: 0.1, max: 5, step: 0.01, default: 1 },
+      { key: 'y', label: 'Scale Y', type: 'number', min: 0.1, max: 5, step: 0.01, default: 1 },
     ],
   },
   'rotate': {
@@ -158,9 +162,59 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     label: 'Warp',
     hasMask: true,
     params: [
-      { key: 'type', label: 'Type', type: 'select', options: ['bulge', 'pinch', 'twist', 'wave'], default: 'bulge' },
+      { key: 'type', label: 'Type', type: 'select', options: ['bulge', 'pinch', 'twist', 'wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells'], default: 'bulge' },
       { key: 'strength', label: 'Strength', type: 'number', min: 0, max: 50, step: 0.5, default: 10 },
-      { key: 'frequency', label: 'Frequency', type: 'number', min: 0.001, max: 0.5, step: 0.001 },
+      {
+        key: 'frequency',
+        label: 'Frequency / Scale',
+        type: 'number',
+        min: 0.001,
+        max: 0.5,
+        step: 0.001,
+        default: 0.05,
+        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+      },
+      {
+        key: 'octaves',
+        label: 'Octaves',
+        type: 'number',
+        min: 1,
+        max: 8,
+        step: 1,
+        default: 1,
+        showIf: (p) => ['turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+      },
+      {
+        key: 'persistence',
+        label: 'Persistence',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+        showIf: (p) => ['turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+      },
+      {
+        key: 'lacunarity',
+        label: 'Lacunarity',
+        type: 'number',
+        min: 1,
+        max: 4,
+        step: 0.1,
+        default: 2,
+        showIf: (p) => ['turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+      },
+      {
+        key: 'distortion',
+        label: 'Distortion',
+        type: 'number',
+        min: 0,
+        max: 50,
+        step: 1,
+        default: 10,
+        showIf: (p) => ['marble'].includes(p.type)
+      },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 99999, step: 1 },
     ],
   },
   'duplicate': {
@@ -175,5 +229,5 @@ export const GENERATORS = Object.keys(TOOL_DEFINITIONS).filter(
 );
 
 export const MODIFIERS = Object.keys(TOOL_DEFINITIONS).filter(
-  (key) => TOOL_DEFINITIONS[key].category === 'modifier'
+  (key) => TOOL_DEFINITIONS[key].category === 'modifier' && !TOOL_DEFINITIONS[key].deprecated
 );

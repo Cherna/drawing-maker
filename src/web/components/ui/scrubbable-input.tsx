@@ -96,6 +96,37 @@ export default function ScrubbableInput({
         };
     }, [isDragging, handleMouseMove, handleMouseUp]);
 
+
+    // Local state to handle typing (including temporary invalid states like "-")
+    const [localValue, setLocalValue] = useState(String(value));
+
+    // Sync local state when prop changes (unless dragging/editing)
+    useEffect(() => {
+        if (!isDragging && document.activeElement !== inputRef.current) {
+            setLocalValue(String(value));
+        }
+    }, [value, isDragging]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newVal = e.target.value;
+        setLocalValue(newVal);
+
+        // Try to parse - if valid number, emit change
+        // Allow "-" or empty to just sit in local state without firing onChange
+        if (newVal === '' || newVal === '-') return;
+
+        const num = parseFloat(newVal);
+        if (!isNaN(num)) {
+            onChange(num);
+        }
+    };
+
+    const handleBlur = () => {
+        // On blur, force sync with valid numeric value from parent
+        // or effectively "reset" invalid input
+        setLocalValue(String(value));
+    };
+
     return (
         <div className={cn("space-y-2", className)}>
             {label && (
@@ -114,25 +145,16 @@ export default function ScrubbableInput({
                 <Input
                     id={id}
                     ref={inputRef}
-                    type="number"
-                    value={value}
-                    onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        if (!isNaN(val)) onChange(val);
-                    }}
-                    step={step}
-                    min={min}
-                    max={max}
+                    type="text" // Change to text to allow "-"
+                    inputMode="decimal"
+                    value={localValue}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
                     className={cn(
                         isDragging && "cursor-ew-resize text-primary border-primary",
                         "transition-colors"
                     )}
                 />
-                {/* Invisible overlay for dragging on the input itself if desired, 
-            but usually blender allows typing in input and dragging on label/icon.
-            Let's allow dragging on the input if holding a modifier? 
-            No, standard web behavior is text selection. 
-            We'll stick to dragging the label or a handle. */}
             </div>
         </div>
     );

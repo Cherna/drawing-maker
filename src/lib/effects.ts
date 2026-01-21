@@ -4,7 +4,7 @@ import { Transformer } from '../core/transformer';
 
 // Seeded random number generator (mulberry32)
 function seededRandom(seed: number) {
-    return function() {
+    return function () {
         let t = seed += 0x6D2B79F5;
         t = Math.imul(t ^ t >>> 15, t | 1);
         t ^= t + Math.imul(t ^ t >>> 7, t | 61);
@@ -35,7 +35,7 @@ export class Effects {
         const seed = options.seed ?? Date.now();
         const rng = seededRandom(seed);
         const noise2D = createNoise2D(rng);
-        
+
         const octaves = options.octaves ?? 1;
         const persistence = options.persistence ?? 0.5;
         const lacunarity = options.lacunarity ?? 2;
@@ -53,10 +53,10 @@ export class Effects {
             for (let i = 0; i < octaves; i++) {
                 const sampleX = x * frequency;
                 const sampleY = y * frequency;
-                
+
                 nx += noise2D(sampleX, sampleY) * amplitude;
                 ny += noise2D_y(sampleX + 100, sampleY + 100) * amplitude;
-                
+
                 maxValue += amplitude;
                 amplitude *= persistence;
                 frequency *= lacunarity;
@@ -90,7 +90,13 @@ export class Effects {
      */
     static trim(model: MakerJs.IModel, threshold: number, mask: (x: number, y: number) => number, seed?: number) {
         const rng = seededRandom(seed ?? Date.now());
-        
+
+        // Threshold acts as a density bias.
+        // Default 0.5 = Unbiased (prob = mask value)
+        // 1.0 = Keep all (prob = mask + 0.5)
+        // 0.0 = Delete all (prob = mask - 0.5)
+        const densityBias = 0.5 - threshold;
+
         const filterPaths = (m: MakerJs.IModel) => {
             if (m.paths) {
                 for (const [id, path] of Object.entries(m.paths)) {
@@ -99,10 +105,40 @@ export class Effects {
                         (extents.low[0] + extents.high[0]) / 2,
                         (extents.low[1] + extents.high[1]) / 2
                     ];
+                    // Mask value 0..1 (0=black=delete, 1=white=keep)
                     const val = mask(mid[0], mid[1]);
 
-                    // Probabilistic trimming: mask value = probability to keep
-                    if (rng() > val) {
+                    // Probabilistic trimming
+                    // val=1 (keep), bias=0 -> rng > 1? false. Keep.
+                    // Wait, rng() > val means: if 0.9 > 0.8 (true) -> DELETE.
+                    // So val=1 (white) -> rng > 1 (false) -> KEEP. Correct.
+                    // val=0 (black) -> rng > 0 (true) -> DELETE. Correct.
+
+                    // With Bias:
+                    // threshold=1 (Keep All) -> bias = -0.5. Check: rng > val - 0.5.
+                    // val=0 -> rng > -0.5 (True). Deletes. WRONG.
+
+                    // Let's rethink.
+                    // We want Probability of KEEPING = P_keep.
+                    // Current: Delete if rng > val. P_delete = (1 - val). P_keep = val.
+
+                    // Target: threshold adjusts P_keep.
+                    // threshold 0.5 -> P_keep = val.
+                    // threshold 1.0 -> P_keep = 1.
+                    // threshold 0.0 -> P_keep = 0.
+
+                    // P_keep = val * (threshold * 2)? (Linear scale)
+                    // Or shift? P_keep = val + (threshold - 0.5).
+
+                    const pKeep = val + (threshold - 0.5);
+                    // P_delete = 1 - pKeep
+                    // Delete if rng < P_delete? Or rng > pKeep? (if rng 0..1)
+
+                    // If rng() < (1 - pKeep) -> Delete.
+                    // rng < 1 - (val + thresh - 0.5)
+                    // rng < 1.5 - val - thresh
+
+                    if (rng() > pKeep) {
                         delete m.paths[id];
                     }
                 }
@@ -125,12 +161,12 @@ export class Effects {
         const sy = scaleY ?? scaleX;
         const ox = origin?.[0] ?? 0;
         const oy = origin?.[1] ?? 0;
-        
+
         Transformer.displace(model, (x, y) => ({
             x: (x - ox) * scaleX + ox,
             y: (y - oy) * sy + oy
         }));
-        
+
         return model;
     }
 
@@ -161,7 +197,7 @@ export class Effects {
                 }
             }
         };
-        
+
         filterShort(model);
         return model;
     }
@@ -170,7 +206,7 @@ export class Effects {
      * Apply a warp effect using a custom displacement function
      */
     static warp(
-        model: MakerJs.IModel, 
+        model: MakerJs.IModel,
         warpFn: (x: number, y: number) => { dx: number, dy: number },
         mask?: (x: number, y: number) => number
     ) {

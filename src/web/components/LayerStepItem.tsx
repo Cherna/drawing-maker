@@ -5,7 +5,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { PipelineStep } from '../../types';
 import { TOOL_DEFINITIONS, GENERATORS, MODIFIERS } from '../lib/tool-definitions';
 import StepParams from './StepParams';
-import { X, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface LayerStepItemProps {
@@ -60,12 +60,18 @@ export default function LayerStepItem({
     <Card className={cn('relative', isLayer && 'border-primary/50')}>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 -ml-1 mr-1 text-muted-foreground hover:text-foreground p-0"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+            title={isExpanded ? "Collapse" : "Expand"}
           >
+            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+          <span className="text-xs font-medium text-muted-foreground min-w-[1.5rem]">
             {index + 1}.
-          </button>
+          </span>
           <div className="flex-1 flex items-center gap-2">
             <Select value={step.tool} onValueChange={handleToolChange}>
               <SelectTrigger className="flex-1 h-8 text-sm">
