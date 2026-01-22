@@ -4,7 +4,6 @@ import { Patterns } from '../lib/patterns';
 import { Effects } from '../lib/effects';
 import { Layout, Box } from '../lib/layout';
 import { Masks } from '../lib/masks';
-import { Transformer } from './transformer';
 import { NoisePatterns, NoiseParams } from '../lib/noise-patterns';
 
 type GeneratorFn = (params: any, ctx: CanvasConfig, bounds: Box) => MakerJs.IModel | Promise<MakerJs.IModel>;
@@ -19,7 +18,7 @@ function deepCloneModel(model: MakerJs.IModel): MakerJs.IModel {
 
     // Deep clone origin if it exists (CRITICAL FIXME: Arrays are objects in JS, cloneObject is shallow)
     if (model.origin) {
-        cloned.origin = [...model.origin];
+        cloned.origin = [model.origin[0], model.origin[1]];
     }
 
     // Ensure paths are deeply cloned
@@ -56,11 +55,11 @@ function deepCloneModel(model: MakerJs.IModel): MakerJs.IModel {
 
 // ==================== GENERATORS ====================
 const GENERATORS: Record<string, GeneratorFn> = {
-    'stripes': (params, ctx, bounds) => {
+    'stripes': (params, _ctx, bounds) => {
         return Patterns.Stripes(params.lines || 50, bounds.width, bounds.height);
     },
 
-    'vertical-stripes': (params, ctx, bounds) => {
+    'vertical-stripes': (params, _ctx, bounds) => {
         return Patterns.VerticalStripes(params.lines || 50, bounds.width, bounds.height);
     },
 

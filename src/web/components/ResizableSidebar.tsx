@@ -15,10 +15,10 @@ export default function ResizableSidebar() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      
+
       const newWidth = e.clientX;
       // Min width 250px, max width 800px
-      const clampedWidth = Math.max(250, Math.min(800, newWidth));
+      const clampedWidth = Math.max(400, Math.min(800, newWidth));
       setWidth(clampedWidth);
     };
 
@@ -50,7 +50,7 @@ export default function ResizableSidebar() {
       <div className="flex-1 overflow-hidden">
         <Sidebar />
       </div>
-      
+
       {/* Resize Handle */}
       <div
         className={cn(

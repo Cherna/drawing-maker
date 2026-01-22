@@ -84,21 +84,19 @@ function optimizeChainOrder(chains: MakerJs.IChain[]): MakerJs.IChain[] {
     optimized.push(current);
 
     // Get end point of a chain
+    // Get end point of a chain
     const getEndPoint = (chain: MakerJs.IChain): [number, number] => {
         if (chain.endless) {
-            const firstPath = chain.paths[0];
-            return firstPath.origin as [number, number];
+            // For endless chains, start == end
+            return chain.links[0].walkedPath.pathContext.origin as [number, number];
         }
         const lastLink = chain.links[chain.links.length - 1];
-        const endPoint = lastLink.walkedPath.pathContext.endPoint || lastLink.walkedPath.pathContext.origin;
+        const endPoint = (lastLink.walkedPath.pathContext as any).end || lastLink.walkedPath.pathContext.origin;
         return endPoint as [number, number];
     };
 
     // Get start point of a chain
     const getStartPoint = (chain: MakerJs.IChain): [number, number] => {
-        if (chain.endless) {
-            return chain.paths[0].origin as [number, number];
-        }
         return chain.links[0].walkedPath.pathContext.origin as [number, number];
     };
 
@@ -134,7 +132,7 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         const post = POST_PROCESSORS[type](config);
         const lines: string[] = [...post.header];
 
-        let chains = MakerJs.model.findChains(model);
+        let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
         console.log(`[G-Code] Found ${chains.length} path chains`);
 
         // Optimize path order if enabled
@@ -146,10 +144,10 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         let arcCount = 0;
         let lineCount = 0;
 
-        chains.forEach((chain, chainIndex) => {
+        chains.forEach((chain: MakerJs.IChain, chainIndex: number) => {
             try {
                 // Move to start of chain (Safe Height first)
-                const start = chain.endless ? chain.paths[0].origin : chain.links[0].walkedPath.pathContext.origin;
+                const start = chain.links[0].walkedPath.pathContext.origin;
                 if (!start) {
                     console.warn(`[G-Code] Chain ${chainIndex}: No start point found, skipping`);
                     return;
@@ -208,10 +206,10 @@ export function generateGCodeForLayers(
                 console.log(`[G-Code] Processing layer: ${layerId}`);
                 lines.push(`(Layer: ${layerId})`);
 
-                const chains = MakerJs.model.findChains(model);
+                const chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
 
-                chains.forEach((chain) => {
-                    const start = chain.endless ? chain.paths[0].origin : chain.links[0].walkedPath.pathContext.origin;
+                chains.forEach((chain: MakerJs.IChain) => {
+                    const start = chain.links[0].walkedPath.pathContext.origin;
                     if (!start) return;
 
                     lines.push(post.formatMove(start[0], start[1]));

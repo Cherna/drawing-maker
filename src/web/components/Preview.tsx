@@ -7,10 +7,7 @@ interface PreviewProps {
   error?: Error | null;
 }
 
-import { useConfigStore } from '../store/config-store';
-
 export default function Preview({ svg, isLoading, error }: PreviewProps) {
-  const strokeWidth = useConfigStore((state) => state.config.canvas.strokeWidth);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-muted/20">

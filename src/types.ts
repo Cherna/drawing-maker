@@ -7,7 +7,6 @@ export interface CanvasConfig {
     width: number;
     height: number;
     margin: MarginConfig;
-    margin: MarginConfig;
 }
 
 // Mask types - geometric and procedural
@@ -19,7 +18,10 @@ export type MaskType =
     | 'turbulence'  // Multi-octave fractal noise
     | 'cells'       // Voronoi/cellular pattern
     | 'waves'       // Sine wave pattern
-    | 'checker';    // Checkerboard pattern
+    | 'checker'     // Checkerboard pattern
+    | 'marble'      // Marble noise pattern
+    | 'simplex'     // Simplex noise
+    | 'perlin';     // Perlin noise
 
 // Mask combination operations
 export type MaskOp = 'multiply' | 'add' | 'subtract' | 'max' | 'min' | 'screen';

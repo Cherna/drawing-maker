@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { AppConfig } from '../../types';
 

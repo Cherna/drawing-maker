@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { AppConfig, PipelineStep, Layer } from '../../types';
+import { AppConfig } from '../../types';
 
 const defaultConfig: AppConfig = {
   sketch: 'pipeline',
@@ -8,7 +8,6 @@ const defaultConfig: AppConfig = {
     height: 297,
     width: 420,
     margin: 60,
-    strokeWidth: 0.7,
   },
   gcode: {
     feedRate: 2000,
@@ -28,6 +27,7 @@ const defaultConfig: AppConfig = {
           { tool: 'move', params: { x: 0, y: 0 } },
         ],
         visible: true,
+        strokeWidth: 0.7,
         color: '#000000'
       }
     ],

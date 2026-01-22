@@ -1,11 +1,9 @@
 import { Label } from './ui/label';
-import { Input } from './ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 import { Slider } from './ui/slider';
 import { PipelineStep, MaskConfig } from '../../types';
 import MaskPreview from './MaskPreview';
-import { useState } from 'react';
 
 const MASK_TYPES = [
   'radial',
