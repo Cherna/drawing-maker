@@ -43,24 +43,31 @@ export function useExport() {
       return response.json();
     },
     onSuccess: (data, config) => {
+      const format = config.exportFormat || 'both';
+
       // Download SVG
-      const svgBlob = new Blob([data.svg], { type: 'image/svg+xml' });
-      const svgUrl = URL.createObjectURL(svgBlob);
-      const svgLink = document.createElement('a');
-      svgLink.href = svgUrl;
-      svgLink.download = `${config.outputBaseName}.svg`;
-      svgLink.click();
+      if (format === 'svg' || format === 'both') {
+        const svgBlob = new Blob([data.svg], { type: 'image/svg+xml' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        const svgLink = document.createElement('a');
+        svgLink.href = svgUrl;
+        svgLink.download = `${config.outputBaseName}.svg`;
+        svgLink.click();
+        URL.revokeObjectURL(svgUrl);
+      }
 
       // Download G-Code
-      const gcodeBlob = new Blob([data.gcode], { type: 'text/plain' });
-      const gcodeUrl = URL.createObjectURL(gcodeBlob);
-      const gcodeLink = document.createElement('a');
-      gcodeLink.href = gcodeUrl;
-      gcodeLink.download = `${config.outputBaseName}.gcode`;
-      gcodeLink.click();
-
-      URL.revokeObjectURL(svgUrl);
-      URL.revokeObjectURL(gcodeUrl);
+      if (format === 'gcode' || format === 'both') {
+        const postProcessor = config.gcode.postProcessor || 'standard';
+        const extension = postProcessor === 'linuxcnc' ? '.ngc' : '.gcode';
+        const gcodeBlob = new Blob([data.gcode], { type: 'text/plain' });
+        const gcodeUrl = URL.createObjectURL(gcodeBlob);
+        const gcodeLink = document.createElement('a');
+        gcodeLink.href = gcodeUrl;
+        gcodeLink.download = `${config.outputBaseName}${extension}`;
+        gcodeLink.click();
+        URL.revokeObjectURL(gcodeUrl);
+      }
     },
   });
 }

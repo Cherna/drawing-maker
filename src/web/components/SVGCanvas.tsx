@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect, useMemo } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
+import { useConfigStore } from '../store/config-store';
 
 interface SVGCanvasProps {
   svg?: string;
@@ -8,6 +9,7 @@ interface SVGCanvasProps {
 }
 
 export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
+  const gcode = useConfigStore((state) => state.config.gcode);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -244,6 +246,67 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
         </div>
       </div>
 
+      {/* Axis Indicator (Fixed Overlay) */}
+      {useConfigStore.getState().config.canvas.showAxisIndicator !== false && (
+        <div
+          className="absolute left-6 top-6 z-20 pointer-events-none p-4 rounded-xl border border-border bg-card/70 shadow-2xl backdrop-blur-md overflow-hidden"
+          style={{ width: '100px', height: '100px' }}
+        >
+          <svg width="100%" height="100%" viewBox="0 0 100 100">
+            <defs>
+              <marker id="arrow-red" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                <path d="M0,0 L6,2 L0,4 Z" fill="#ef4444" />
+              </marker>
+              <marker id="arrow-green" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                <path d="M0,0 L6,2 L0,4 Z" fill="#22c55e" />
+              </marker>
+            </defs>
+
+            {/* Origin at center to allow inversion in all directions */}
+            <g transform="translate(50, 50)">
+              <circle cx="0" cy="0" r="2.5" fill="currentColor" className="text-muted-foreground/50" />
+
+              {/* X Axis (Red) */}
+              <line
+                x1="0" y1="0"
+                x2={gcode.invertX ? -22 : 22} y2="0"
+                stroke="#ef4444"
+                strokeWidth="3"
+                strokeLinecap="round"
+                markerEnd="url(#arrow-red)"
+              />
+              <text
+                x={gcode.invertX ? -32 : 32}
+                y="4"
+                fontSize="11"
+                fill="#ef4444"
+                fontWeight="bold"
+                textAnchor="middle"
+              >X</text>
+
+              {/* Y Axis (Green) */}
+              <line
+                x1="0" y1="0"
+                x2="0" y2={gcode.invertY ? -22 : 22}
+                stroke="#22c55e"
+                strokeWidth="3"
+                strokeLinecap="round"
+                markerEnd="url(#arrow-green)"
+              />
+              <text
+                x="0"
+                y={gcode.invertY ? -32 : 40}
+                fontSize="11"
+                fill="#22c55e"
+                fontWeight="bold"
+                textAnchor="middle"
+              >Y</text>
+            </g>
+          </svg>
+          <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] font-mono tracking-wider text-muted-foreground uppercase opacity-40">Origin</div>
+        </div>
+      )}
+
       {/* Canvas - flex centering with transform for pan/zoom */}
       <div
         ref={containerRef}
@@ -259,9 +322,11 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transformOrigin: 'center center',
+            position: 'relative'
           }}
-          dangerouslySetInnerHTML={{ __html: normalizedSvg }}
-        />
+        >
+          <div dangerouslySetInnerHTML={{ __html: normalizedSvg || '' }} />
+        </div>
       </div>
     </div>
   );

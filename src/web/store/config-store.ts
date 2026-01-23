@@ -3,7 +3,7 @@ import { AppConfig } from '../../types';
 
 const defaultConfig: AppConfig = {
   sketch: 'pipeline',
-  outputBaseName: 'drawing',
+  outputBaseName: 'drawing-maker',
   canvas: {
     height: 297,
     width: 420,
@@ -11,9 +11,13 @@ const defaultConfig: AppConfig = {
   },
   gcode: {
     feedRate: 2000,
+    travelRate: 3500,
     zUp: 5,
     zDown: 0,
     postProcessor: 'standard',
+    invertX: false,
+    invertY: true,
+    optimizePaths: true,
   },
   params: {
     seed: Math.floor(Math.random() * 10000),

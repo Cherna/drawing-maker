@@ -2,19 +2,25 @@
   "sketch": "pipeline",
   "outputBaseName": "drawing",
   "canvas": {
-    "width": 300,
-    "height": 200,
+    "width": 420,
+    "height": 297,
     "margin": [
-      50,
-      50,
-      50,
-      50
+      80,
+      80,
+      80,
+      80
     ]
   },
   "gcode": {
-    "feedRate": 2000,
+    "feedRate": 1000,
     "zUp": 5,
-    "zDown": 0
+    "zDown": -2,
+    "postProcessor": "linuxcnc",
+    "useArcs": true,
+    "optimizePaths": true,
+    "dwellTime": 20,
+    "travelRate": 3500,
+    "invertY": true
   },
   "params": {
     "seed": 1804,

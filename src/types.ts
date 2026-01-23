@@ -7,6 +7,7 @@ export interface CanvasConfig {
     width: number;
     height: number;
     margin: MarginConfig;
+    showAxisIndicator?: boolean;
 }
 
 // Mask types - geometric and procedural
@@ -76,12 +77,15 @@ export interface PipelineParams {
 
 export interface GCodeConfig {
     feedRate: number;
+    travelRate: number;
     zUp: number;
     zDown: number;
     postProcessor?: 'standard' | 'linuxcnc' | 'reprap';
     useArcs?: boolean;           // Use G2/G3 for circular paths (default: false)
     optimizePaths?: boolean;      // Sort paths to minimize travel (default: false)
     dwellTime?: number;          // Pause in ms after Z-down (default: 0)
+    invertX?: boolean;           // Invert X axis (positive becomes negative)
+    invertY?: boolean;           // Invert Y axis (positive becomes negative)
 }
 
 export interface SketchGenerator {
@@ -94,4 +98,5 @@ export interface AppConfig {
     canvas: CanvasConfig;
     gcode: GCodeConfig;
     params: any; // Sketch specific parameters
+    exportFormat?: 'svg' | 'gcode' | 'both';
 }

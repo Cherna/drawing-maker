@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import MakerJs from 'makerjs';
-import { generateGCode } from './core/gcode';
+import { generateGCode, getGCodeExtension, PostProcessorType } from './core/gcode';
 import { modelToSVG } from './core/svg-exporter';
 import { AppConfig, SketchGenerator } from './types';
 import { PipelineSketch } from './sketches/pipeline-sketch';
@@ -26,11 +26,11 @@ const SKETCHES: Record<string, SketchGenerator> = {
 };
 
 // --- FILE VERSIONING ---
-function getNextFilename(outputDir: string, baseName: string): string {
+function getNextFilename(outputDir: string, baseName: string, extension: string): string {
     let counter = 1;
     while (true) {
         const numStr = counter.toString().padStart(3, '0');
-        const filename = `${baseName}_${numStr}.gcode`;
+        const filename = `${baseName}_${numStr}${extension}`;
         if (!fs.existsSync(path.join(outputDir, filename))) {
             return filename;
         }
@@ -62,8 +62,10 @@ async function main() {
         console.log(`Running sketch: ${config.sketch}...`);
         const model = await generator.generate(config.canvas, config.params);
 
+        const postProcessor = (config.gcode.postProcessor || 'standard') as PostProcessorType;
+
         // 4. Export G-Code
-        const gcode = generateGCode(model, config, config.gcode.postProcessor || 'standard');
+        const gcode = generateGCode(model, config, postProcessor);
 
         // 5. Save Files
         const outputDir = path.join(__dirname, '../drawings');
@@ -72,13 +74,14 @@ async function main() {
         }
 
         // Versioned GCode
-        const gcodeFilename = getNextFilename(outputDir, config.outputBaseName);
+        const extension = getGCodeExtension(postProcessor);
+        const gcodeFilename = getNextFilename(outputDir, config.outputBaseName, extension);
         const gcodePath = path.join(outputDir, gcodeFilename);
         fs.writeFileSync(gcodePath, gcode);
         console.log(`Saved G-Code to: ${gcodePath}`);
 
         // SVG (Match GCode filename)
-        const svgFilename = gcodeFilename.replace('.gcode', '.svg');
+        const svgFilename = gcodeFilename.replace(extension, '.svg');
         const svgPath = path.join(outputDir, svgFilename);
 
         // Use custom SVG exporter that preserves coordinates

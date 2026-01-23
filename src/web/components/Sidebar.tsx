@@ -1,5 +1,5 @@
 import CollapsibleSection from './ui/collapsible-section';
-import CanvasControls from './CanvasControls';
+import CanvasControls, { GCodeSettings } from './CanvasControls';
 import GlobalControls from './GlobalControls';
 import LayersEditor from './LayersEditor';
 import FileControls from './FileControls';
@@ -13,6 +13,10 @@ export default function Sidebar() {
 
       <CollapsibleSection title="Canvas Settings" defaultExpanded={false}>
         <CanvasControls />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="G-Code Settings" defaultExpanded={false}>
+        <GCodeSettings />
       </CollapsibleSection>
 
       <CollapsibleSection title="Global Settings" defaultExpanded={false}>
