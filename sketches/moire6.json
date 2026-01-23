@@ -41,6 +41,19 @@
         }
       },
       {
+        "tool": "rotate",
+        "params": {
+          "rotation": 3
+        }
+      },
+      {
+        "tool": "move",
+        "params": {
+          "x": -6,
+          "y": 2
+        }
+      },
+      {
         "tool": "duplicate",
         "params": {
           "id": "layer_1"
@@ -70,7 +83,14 @@
       {
         "tool": "rotate",
         "params": {
-          "rotation": -3
+          "rotation": -2
+        }
+      },
+      {
+        "tool": "move",
+        "params": {
+          "x": 0,
+          "y": -5
         }
       }
     ],
@@ -99,10 +119,24 @@
               "lacunarity": 4,
               "persistence": 1
             }
+          },
+          {
+            "tool": "rotate",
+            "params": {
+              "rotation": 3
+            }
+          },
+          {
+            "tool": "move",
+            "params": {
+              "x": -6,
+              "y": 2
+            }
           }
         ],
         "visible": true,
-        "color": "#000000"
+        "color": "#000000",
+        "strokeWidth": 0.4
       },
       {
         "id": "layer_1",
@@ -132,14 +166,22 @@
           {
             "tool": "rotate",
             "params": {
-              "rotation": -3
+              "rotation": -2
+            }
+          },
+          {
+            "tool": "move",
+            "params": {
+              "x": 0,
+              "y": -5
             }
           }
         ],
         "visible": true,
-        "color": "#000000"
+        "color": "#000000",
+        "strokeWidth": 0.4
       }
     ],
-    "activeLayerId": "layer_1"
+    "activeLayerId": "base"
   }
 }

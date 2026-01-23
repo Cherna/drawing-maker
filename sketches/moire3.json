@@ -2,13 +2,13 @@
   "sketch": "pipeline",
   "outputBaseName": "drawing",
   "canvas": {
-    "width": 300,
-    "height": 200,
+    "width": 420,
+    "height": 297,
     "margin": [
-      50,
-      50,
-      50,
-      50
+      80,
+      80,
+      80,
+      80
     ]
   },
   "gcode": {
@@ -22,13 +22,14 @@
       {
         "tool": "stripes",
         "params": {
-          "lines": 100
+          "lines": 120
         }
       },
       {
         "tool": "resample",
         "params": {
-          "res": 1
+          "res": 1,
+          "detail": 1
         }
       },
       {
@@ -49,7 +50,7 @@
       {
         "tool": "stripes",
         "params": {
-          "lines": 100
+          "lines": 120
         }
       },
       {
@@ -70,7 +71,7 @@
       {
         "tool": "rotate",
         "params": {
-          "rotation": -3
+          "rotation": -2
         }
       }
     ],
@@ -82,13 +83,14 @@
           {
             "tool": "stripes",
             "params": {
-              "lines": 100
+              "lines": 120
             }
           },
           {
             "tool": "resample",
             "params": {
-              "res": 1
+              "res": 1,
+              "detail": 1
             }
           },
           {
@@ -112,7 +114,7 @@
           {
             "tool": "stripes",
             "params": {
-              "lines": 100
+              "lines": 120
             }
           },
           {
@@ -133,7 +135,7 @@
           {
             "tool": "rotate",
             "params": {
-              "rotation": -3
+              "rotation": -2
             }
           }
         ],
@@ -142,6 +144,6 @@
         "strokeWidth": 0.4
       }
     ],
-    "activeLayerId": "base"
+    "activeLayerId": "layer_1"
   }
 }
