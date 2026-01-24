@@ -1,6 +1,6 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "drawing",
+  "outputBaseName": "test5",
   "canvas": {
     "height": 297,
     "width": 420,
@@ -15,8 +15,13 @@
   "gcode": {
     "feedRate": 2000,
     "zUp": 5,
-    "zDown": 0,
-    "postProcessor": "standard"
+    "zDown": -2,
+    "postProcessor": "linuxcnc",
+    "travelRate": 3500,
+    "useArcs": true,
+    "optimizePaths": true,
+    "invertY": true,
+    "dwellTime": 20
   },
   "params": {
     "seed": 8560,
@@ -91,7 +96,7 @@
             }
           }
         ],
-        "visible": true,
+        "visible": false,
         "color": "#000000",
         "strokeWidth": 0.7
       },
@@ -132,7 +137,7 @@
             }
           }
         ],
-        "visible": true,
+        "visible": false,
         "color": "#000000",
         "strokeWidth": 0.7
       }
@@ -161,82 +166,6 @@
           "persistence": 0.5,
           "lacunarity": 2,
           "distortion": 10
-        }
-      },
-      {
-        "tool": "duplicate",
-        "params": {
-          "id": "layer_1"
-        }
-      },
-      {
-        "tool": "spiral",
-        "params": {
-          "turns": 40,
-          "pointsPerTurn": 20
-        }
-      },
-      {
-        "tool": "resample",
-        "params": {
-          "detail": 1
-        }
-      },
-      {
-        "tool": "warp",
-        "params": {
-          "type": "perlin",
-          "strength": 14.4,
-          "frequency": 0.008,
-          "octaves": 1,
-          "persistence": 0.5,
-          "lacunarity": 2,
-          "distortion": 10
-        }
-      },
-      {
-        "tool": "move",
-        "params": {
-          "x": -11,
-          "y": 15
-        }
-      },
-      {
-        "tool": "duplicate",
-        "params": {
-          "id": "layer_2"
-        }
-      },
-      {
-        "tool": "spiral",
-        "params": {
-          "turns": 40,
-          "pointsPerTurn": 50
-        }
-      },
-      {
-        "tool": "resample",
-        "params": {
-          "detail": 1
-        }
-      },
-      {
-        "tool": "warp",
-        "params": {
-          "type": "perlin",
-          "strength": 5.4,
-          "frequency": 0.008,
-          "octaves": 1,
-          "persistence": 0.5,
-          "lacunarity": 2,
-          "distortion": 10
-        }
-      },
-      {
-        "tool": "move",
-        "params": {
-          "x": 28,
-          "y": -16
         }
       }
     ]

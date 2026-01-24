@@ -2,13 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { useConfigStore } from '../store/config-store';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Save, FolderOpen, FilePlus, RefreshCw } from 'lucide-react';
+import { Save, FolderOpen, FilePlus, RefreshCw, Trash2 } from 'lucide-react';
 
 export default function FileControls() {
     const { config, setConfig } = useConfigStore();
     const [activeFile, setActiveFile] = useState<string | null>(null);
     const [sketches, setSketches] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Store the stringified version of the config when loaded/saved
+    // This allows us to check if the current state is truly different (dirty)
+    const [savedConfigStr, setSavedConfigStr] = useState<string>(JSON.stringify(config));
 
     const refreshSketches = useCallback(async () => {
         try {
@@ -53,6 +57,8 @@ export default function FileControls() {
                 // Update local store with the new name
                 setConfig(updatedConfig);
                 setActiveFile(cleanName);
+                // Update saved state reference
+                setSavedConfigStr(JSON.stringify(updatedConfig));
                 refreshSketches();
                 return true;
             }
@@ -82,9 +88,39 @@ export default function FileControls() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!activeFile) return;
+
+        if (!confirm(`Are you sure you want to delete "${activeFile}"?`)) return;
+
+        setIsLoading(true);
+        try {
+            const res = await fetch(`http://localhost:3000/api/sketches/${activeFile}.json`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                setActiveFile(null); // Clear active file as it's gone
+                // We don't reset config here, user might want to save it as something else
+                refreshSketches();
+            } else {
+                throw new Error('Failed to delete');
+            }
+        } catch (e) {
+            console.error('Failed to delete sketch:', e);
+            alert('Failed to delete sketch');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const loadSketch = async (filename: string) => {
-        if (activeFile) {
-            if (!confirm(`Discard changes to "${activeFile}"?`)) return;
+        // Check if dirty
+        const currentConfigStr = JSON.stringify(config);
+        const isDirty = currentConfigStr !== savedConfigStr;
+
+        if (isDirty) {
+            if (!confirm(`Discard changes to "${activeFile || 'current sketch'}"?`)) return;
         }
 
         setIsLoading(true);
@@ -93,8 +129,17 @@ export default function FileControls() {
             if (!res.ok) throw new Error('Sketch not found');
             const newConfig = await res.json();
             setConfig(newConfig);
+
+            // Clear undo history to start fresh
+            const temporal = (useConfigStore as any).temporal;
+            if (temporal) {
+                temporal.getState().clear();
+            }
+
             // Filename from dropdown includes extension usually, but let's be safe
             setActiveFile(filename.replace('.json', ''));
+            // Update saved state reference
+            setSavedConfigStr(JSON.stringify(newConfig));
         } catch (e) {
             console.error('Failed to load sketch:', e);
             alert('Failed to load sketch');
@@ -122,7 +167,13 @@ export default function FileControls() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={handleSave}
+                    onClick={() => {
+                        if (activeFile) {
+                            performSave(activeFile);
+                        } else {
+                            handleSaveAs();
+                        }
+                    }}
                     disabled={isLoading}
                     title={activeFile ? `Save "${activeFile}" (Ctrl+S)` : "Save (Ctrl+S)"}
                 >
@@ -138,6 +189,49 @@ export default function FileControls() {
                 >
                     <FilePlus className="w-4 h-4" />
                 </Button>
+                {activeFile && (
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-foreground hover:bg-accent px-2"
+                            onClick={async () => {
+                                const newName = prompt('Rename to...', activeFile);
+                                if (newName && newName !== activeFile) {
+                                    const saved = await performSave(newName);
+                                    if (saved) {
+                                        // Delete the old file
+                                        setIsLoading(true);
+                                        try {
+                                            await fetch(`http://localhost:3000/api/sketches/${activeFile}.json`, {
+                                                method: 'DELETE'
+                                            });
+                                            refreshSketches();
+                                        } catch (e) {
+                                            console.error('Failed to delete old file after rename');
+                                        } finally {
+                                            setIsLoading(false);
+                                        }
+                                    }
+                                }
+                            }}
+                            disabled={isLoading}
+                            title={`Rename "${activeFile}"`}
+                        >
+                            <span className="text-xs">Rename</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
+                            onClick={handleDelete}
+                            disabled={isLoading}
+                            title={`Delete "${activeFile}"`}
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
+                    </>
+                )}
             </div>
 
             <div className="flex gap-2">

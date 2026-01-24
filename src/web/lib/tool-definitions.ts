@@ -56,6 +56,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     label: 'Concentric Circles',
     params: [
       { key: 'count', label: 'Count', type: 'number', min: 1, max: 200, step: 1, default: 20 },
+      { key: 'checkBounds', label: 'Clip Bounds', type: 'boolean', default: true },
     ],
   },
   'radial': {
@@ -84,6 +85,11 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     ],
   },
   // Modifiers
+  'clip': {
+    category: 'modifier',
+    label: 'Clip',
+    params: [],
+  },
   'resample': {
     category: 'modifier',
     label: 'Resample',

@@ -263,6 +263,25 @@ app.get('/api/sketches/:filename', async (req, res) => {
     }
 });
 
+// API: Delete sketch
+app.delete('/api/sketches/:filename', async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const filePath = path.join(SKETCHES_DIR, filename);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Sketch not found' });
+        }
+
+        fs.unlinkSync(filePath);
+        console.log(`Deleted sketch: ${filePath}`);
+        res.json({ success: true, filename });
+    } catch (error: any) {
+        console.error('Delete error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     if (process.env.NODE_ENV === 'production') {
         console.log(`🎨 Drawing Maker server running at http://localhost:${PORT}`);

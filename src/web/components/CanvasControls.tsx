@@ -172,6 +172,8 @@ export default function CanvasControls() {
   );
 }
 
+import ScrubbableInput from './ui/scrubbable-input';
+
 export function GCodeSettings() {
   const gcode = useConfigStore((state) => state.config.gcode);
   const updateGCode = useConfigStore((state) => state.updateGCode);
@@ -194,48 +196,44 @@ export function GCodeSettings() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="feed-rate">Feed Rate (mm/min)</Label>
-          <Input
+          <ScrubbableInput
             id="feed-rate"
-            type="number"
-            min="100"
-            max="10000"
-            step="100"
+            min={100}
+            max={10000}
+            step={100}
             value={gcode.feedRate}
-            onChange={(e) => updateGCode({ feedRate: parseFloat(e.target.value) || 1000 })}
+            onChange={(val) => updateGCode({ feedRate: val || 1000 })}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="travel-rate">Travel Rate (mm/min)</Label>
-          <Input
+          <ScrubbableInput
             id="travel-rate"
-            type="number"
-            min="100"
-            max="10000"
-            step="100"
+            min={100}
+            max={10000}
+            step={100}
             value={gcode.travelRate}
-            onChange={(e) => updateGCode({ travelRate: parseFloat(e.target.value) || 3500 })}
+            onChange={(val) => updateGCode({ travelRate: val || 3500 })}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="z-up">Z-Up / Pen Up (mm)</Label>
-          <Input
+          <ScrubbableInput
             id="z-up"
-            type="number"
-            min="0"
-            max="50"
+            min={0}
+            max={50}
             value={gcode.zUp}
-            onChange={(e) => updateGCode({ zUp: parseFloat(e.target.value) || 5 })}
+            onChange={(val) => updateGCode({ zUp: val || 5 })}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="z-down">Z-Down / Pen Down (mm)</Label>
-          <Input
+          <ScrubbableInput
             id="z-down"
-            type="number"
-            min="-10"
-            max="10"
+            min={-10}
+            max={10}
             value={gcode.zDown}
-            onChange={(e) => updateGCode({ zDown: parseFloat(e.target.value) || 0 })}
+            onChange={(val) => updateGCode({ zDown: val !== undefined ? val : 0 })}
           />
         </div>
 

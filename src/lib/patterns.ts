@@ -65,7 +65,8 @@ export class Patterns {
         options?: {
             centerX?: number,  // 0-1, default 0.5
             centerY?: number,  // 0-1, default 0.5
-            minRadius?: number // Starting radius, default 0
+            minRadius?: number, // Starting radius, default 0
+            checkBounds?: boolean // If true (default), clip to width/height. If false, allow circles to exceed bounds.
         }
     ): MakerJs.IModel {
         const model: MakerJs.IModel = { paths: {} };
@@ -99,15 +100,22 @@ export class Patterns {
         if (minRadius >= maxRadius) return model;
 
         const step = (maxRadius - minRadius) / safeCount;
+        const checkBounds = options?.checkBounds !== false; // Default to TRUE (clip)
 
         for (let i = 1; i <= safeCount; i++) {
             const r = minRadius + i * step;
             if (r > 0) {
-                // Manual clipping to rectangle
-                const arcs = getClippedCircleTrimming(cx, cy, r, safeWidth, safeHeight);
-                arcs.forEach((path, idx) => {
-                    model.paths![`c_${i}_${idx}`] = path;
-                });
+                if (checkBounds) {
+                    // Manual clipping to rectangle
+                    const arcs = getClippedCircleTrimming(cx, cy, r, safeWidth, safeHeight);
+                    arcs.forEach((path, idx) => {
+                        model.paths![`c_${i}_${idx}`] = path;
+                    });
+                } else {
+                    // No clipping - full circle
+                    const circle = new MakerJs.paths.Circle([cx, cy], r);
+                    model.paths![`c_${i}`] = circle;
+                }
             }
         }
 
@@ -151,18 +159,17 @@ export class Patterns {
         const radiusStep = (maxRadius - startRadius) / totalPoints;
         const angleStep = (2 * Math.PI) / pointsPerTurn * direction;
 
-        let prevX = cx + startRadius;
-        let prevY = cy;
+        let prevPoint: MakerJs.IPoint = [cx + startRadius, cy];
 
         for (let i = 1; i <= totalPoints; i++) {
             const angle = i * angleStep;
             const r = startRadius + i * radiusStep;
             const x = cx + r * Math.cos(angle);
             const y = cy + r * Math.sin(angle);
+            const currentPoint: MakerJs.IPoint = [x, y];
 
-            model.paths![`sp_${i}`] = new MakerJs.paths.Line([prevX, prevY], [x, y]);
-            prevX = x;
-            prevY = y;
+            model.paths![`sp_${i}`] = new MakerJs.paths.Line(prevPoint, currentPoint);
+            prevPoint = currentPoint;
         }
 
         return model;
@@ -440,9 +447,6 @@ function getClippedCircleTrimming(cx: number, cy: number, r: number, w: number, 
             const next = uniqueAngles[(i + 1) % uniqueAngles.length];
             checkAndAddArc(current, next);
         }
-        // Explicitly check wrapping interval
-        checkAndAddArc(uniqueAngles[uniqueAngles.length - 1], uniqueAngles[0]);
     }
-
     return paths;
 }

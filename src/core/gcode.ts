@@ -414,9 +414,19 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
                 // Extract points from chain
                 let points = MakerJs.chain.toKeyPoints(optimized.chain, 1.0);
 
-                // Reverse the POINTS array if needed (not the chain!)
                 if (optimized.reverse) {
                     points = points.reverse();
+                }
+
+                // Ensure closed loops have the closing point
+                if (optimized.chain.endless && points.length > 0) {
+                    const start = points[0];
+                    const end = points[points.length - 1];
+                    // Check distance to handle floating point issues
+                    const dist = Math.hypot(start[0] - end[0], start[1] - end[1]);
+                    if (dist > 0.001) {
+                        points.push(start);
+                    }
                 }
 
                 if (points.length === 0) return;
@@ -496,6 +506,16 @@ export function generateGCodeForLayers(
                     // Reverse the POINTS array if needed
                     if (optimized.reverse) {
                         points = points.reverse();
+                    }
+
+                    // Ensure closed loops have the closing point
+                    if (optimized.chain.endless && points.length > 0) {
+                        const start = points[0];
+                        const end = points[points.length - 1];
+                        const dist = Math.hypot(start[0] - end[0], start[1] - end[1]);
+                        if (dist > 0.001) {
+                            points.push(start);
+                        }
                     }
 
                     if (points.length === 0) return;

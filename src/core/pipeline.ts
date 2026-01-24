@@ -73,7 +73,8 @@ const GENERATORS: Record<string, GeneratorFn> = {
         return Patterns.Concentric(params.count || 20, bounds.width, bounds.height, {
             centerX: params.centerX,
             centerY: params.centerY,
-            minRadius: params.minRadius
+            minRadius: params.minRadius,
+            checkBounds: params.checkBounds
         });
     },
 
@@ -122,6 +123,10 @@ const MODIFIERS: Record<string, ModifierFn> = {
         const detail = params.detail || params.res || 1.0;
         const resolution = 1.0 / Math.max(0.01, detail);
         return Effects.resample(model, resolution);
+    },
+
+    'clip': (model, params, ctx, bounds) => {
+        Effects.clip(model, bounds);
     },
 
     'noise': (model, params, ctx, bounds, mask) => {

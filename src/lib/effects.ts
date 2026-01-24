@@ -241,4 +241,76 @@ export class Effects {
         });
         return model;
     }
+
+    /**
+     * Clip the model to a bounding box.
+     * Useful for trimming patterns that extend beyond the canvas.
+     */
+    static clip(model: MakerJs.IModel, bounds: { x: number, y: number, width: number, height: number }) {
+        // Auto-resample arcs first so we can use line clipping
+        if (modelHasArcs(model)) {
+            model = Transformer.resample(model, 0.5);
+        }
+
+        const minX = bounds.x;
+        const maxX = bounds.x + bounds.width;
+        const minY = bounds.y;
+        const maxY = bounds.y + bounds.height;
+
+        const clipLine = (p1: MakerJs.IPoint, p2: MakerJs.IPoint): [MakerJs.IPoint, MakerJs.IPoint] | null => {
+            let t0 = 0, t1 = 1;
+            const dx = p2[0] - p1[0];
+            const dy = p2[1] - p1[1];
+            const p = [-dx, dx, -dy, dy];
+            const q = [p1[0] - minX, maxX - p1[0], p1[1] - minY, maxY - p1[1]];
+
+            for (let i = 0; i < 4; i++) {
+                if (p[i] === 0) {
+                    if (q[i] < 0) return null; // Parallel and outside
+                } else {
+                    const t = q[i] / p[i];
+                    if (p[i] < 0) {
+                        if (t > t1) return null;
+                        if (t > t0) t0 = t;
+                    } else {
+                        if (t < t0) return null;
+                        if (t < t1) t1 = t;
+                    }
+                }
+            }
+
+            if (t0 > t1) return null;
+
+            return [
+                [p1[0] + t0 * dx, p1[1] + t0 * dy],
+                [p1[0] + t1 * dx, p1[1] + t1 * dy]
+            ];
+        };
+
+        const processModel = (m: MakerJs.IModel) => {
+            if (m.paths) {
+                for (const key of Object.keys(m.paths)) {
+                    const path = m.paths[key];
+                    if (path.type === 'line') {
+                        const line = path as MakerJs.IPathLine;
+                        const clipped = clipLine(line.origin, line.end);
+                        if (clipped) {
+                            line.origin = clipped[0];
+                            line.end = clipped[1];
+                        } else {
+                            delete m.paths[key];
+                        }
+                    }
+                }
+            }
+            if (m.models) {
+                for (const key of Object.keys(m.models)) {
+                    processModel(m.models[key]);
+                }
+            }
+        };
+
+        processModel(model);
+        return model;
+    }
 }
