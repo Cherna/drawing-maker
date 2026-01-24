@@ -207,8 +207,24 @@ app.post('/api/save', async (req, res) => {
             return res.status(400).json({ error: 'Filename and config are required' });
         }
 
-        const safeFilename = filename.endsWith('.json') ? filename : `${filename}.json`;
-        const filePath = path.join(SKETCHES_DIR, safeFilename);
+        let baseName = filename.replace(/\.json$/, '');
+        let safeFilename = `${baseName}.json`;
+        let filePath = path.join(SKETCHES_DIR, safeFilename);
+
+        // Auto-increment if file exists
+        if (fs.existsSync(filePath)) {
+            let counter = 1;
+            while (true) {
+                const nextName = `${baseName}${counter}.json`;
+                const nextPath = path.join(SKETCHES_DIR, nextName);
+                if (!fs.existsSync(nextPath)) {
+                    safeFilename = nextName;
+                    filePath = nextPath;
+                    break;
+                }
+                counter++;
+            }
+        }
 
         fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
         console.log(`Saved sketch to ${filePath}`);

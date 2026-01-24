@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+
 import { Button } from './ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { useConfigStore } from '../store/config-store';
@@ -21,7 +22,14 @@ export default function LayersEditor() {
     }
     // If no layers exist, create base layer from steps
     return [
-      { id: 'base', name: 'Base Layer', steps: config.params?.steps || [], visible: true }
+      {
+        id: 'base',
+        name: 'Base Layer',
+        steps: config.params?.steps || [],
+        visible: true,
+        color: '#000000',
+        strokeWidth: 0.7
+      }
     ];
   };
 
@@ -160,6 +168,7 @@ export default function LayersEditor() {
       steps: [],
       visible: true,
       color: DEFAULT_COLORS[colorIndex],
+      strokeWidth: 0.7, // Default stroke width
     };
 
     const updatedLayers = [...layers, newLayer];
@@ -185,6 +194,7 @@ export default function LayersEditor() {
       steps: JSON.parse(JSON.stringify(activeLayer.steps)),
       visible: true,
       color: activeLayer.color || '#000000', // Preserve the original layer's color!
+      strokeWidth: activeLayer.strokeWidth, // Preserve stroke width
       opacity: activeLayer.opacity,
     };
 
@@ -236,9 +246,27 @@ export default function LayersEditor() {
         ...config.params,
         layers: updatedLayers,
         steps: flatSteps,
+
       }
     });
+    // Wait, the original `handleToggleVisibility` used `activeLayerId: newLayerId`? No.
+    // Original code: line 239 just closed `updateConfig`.
+    // My replacement needs to match perfectly.
+    // I should probably split this into smaller chunks or copy exact original code for unmodified functions.
+    // OR better: Just target `handleCreateLayer`, `handleDuplicateLayer` and the JSX input.
+    // Targeting lines 153-202 covers create and duplicate.
+    // Then target 388-410 for input.
+    // I will split into 2 chunks.
   };
+
+  // ... Wait, I should not replace multiple functions if I can avoid it.
+  // Chunk 1: handleCreateLayer and handleDuplicateLayer.
+  // Chunk 2: JSX Input.
+
+  // Actually, I'll just use MultiReplace.
+
+
+
 
   const handleUpdateLayerColor = (layerId: string, color: string) => {
     const updatedLayers = layers.map(layer =>
@@ -390,7 +418,7 @@ export default function LayersEditor() {
                     min="0.1"
                     max="5.0"
                     step="0.05"
-                    value={layer.strokeWidth || 0.25}
+                    value={layer.strokeWidth ?? 0.7}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       e.stopPropagation();
