@@ -88,7 +88,12 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
   'clip': {
     category: 'modifier',
     label: 'Clip',
-    params: [],
+    params: [
+      { key: 'top', label: 'Top Margin', type: 'number', min: 0, max: 100, step: 1, default: 0 },
+      { key: 'right', label: 'Right Margin', type: 'number', min: 0, max: 100, step: 1, default: 0 },
+      { key: 'bottom', label: 'Bottom Margin', type: 'number', min: 0, max: 100, step: 1, default: 0 },
+      { key: 'left', label: 'Left Margin', type: 'number', min: 0, max: 100, step: 1, default: 0 },
+    ],
   },
   'resample': {
     category: 'modifier',

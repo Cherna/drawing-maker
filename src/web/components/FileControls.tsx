@@ -28,7 +28,7 @@ export default function FileControls() {
         refreshSketches();
     }, [refreshSketches]);
 
-    const performSave = async (filename: string) => {
+    const performSave = async (filename: string, overwrite: boolean = false) => {
         setIsLoading(true);
         try {
             // Sanitize filename: ASCII alphanumeric, dot, dash, underscore only
@@ -50,13 +50,19 @@ export default function FileControls() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // Use sanitized name for saving
-                body: JSON.stringify({ filename: cleanName, config: updatedConfig }),
+                body: JSON.stringify({ filename: cleanName, config: updatedConfig, overwrite }),
             });
             const data = await res.json();
             if (data.success) {
                 // Update local store with the new name
                 setConfig(updatedConfig);
-                setActiveFile(cleanName);
+                setActiveFile(cleanName); // Sets active file to the SAVED name (which might include increment if overwrite=false)
+
+                // If we attempted to save as "foo" but got "foo1", activeFile becomes "foo1". This is correct.
+                if (data.filename) {
+                    setActiveFile(data.filename.replace('.json', ''));
+                }
+
                 // Update saved state reference
                 setSavedConfigStr(JSON.stringify(updatedConfig));
                 refreshSketches();
@@ -73,9 +79,8 @@ export default function FileControls() {
 
     const handleSave = async () => {
         if (activeFile) {
-            if (confirm(`Overwrite "${activeFile}"?`)) {
-                await performSave(activeFile);
-            }
+            // Implicit overwrite for "Save"
+            await performSave(activeFile, true);
         } else {
             handleSaveAs();
         }
@@ -84,7 +89,8 @@ export default function FileControls() {
     const handleSaveAs = async () => {
         const name = prompt('Save as...', activeFile || 'my-drawing');
         if (name) {
-            await performSave(name);
+            // "Save As" behavior per request: check bounds/append number -> overwrite=false
+            await performSave(name, false);
         }
     };
 

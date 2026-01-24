@@ -246,16 +246,68 @@ export class Effects {
      * Clip the model to a bounding box.
      * Useful for trimming patterns that extend beyond the canvas.
      */
-    static clip(model: MakerJs.IModel, bounds: { x: number, y: number, width: number, height: number }) {
+    static clip(model: MakerJs.IModel, bounds: { x: number, y: number, width: number, height: number }, margin?: number | [number, number, number, number]) {
         // Auto-resample arcs first so we can use line clipping
         if (modelHasArcs(model)) {
             model = Transformer.resample(model, 0.5);
         }
 
-        const minX = bounds.x;
-        const maxX = bounds.x + bounds.width;
-        const minY = bounds.y;
-        const maxY = bounds.y + bounds.height;
+        let minX = bounds.x;
+        let maxX = bounds.x + bounds.width;
+        let minY = bounds.y;
+        let maxY = bounds.y + bounds.height;
+
+        // Apply margins if provided
+        if (margin) {
+            if (Array.isArray(margin)) {
+                // [top, right, bottom, left]
+                // Top is +Y (CHECK THIS: makerjs coords are typically Y-up? Layout.getDrawArea usually defines bounds.)
+                // Let's assume standard Cartesian where Y increases upwards? 
+                // Or screen coords?
+                // Layout.getDrawArea returns bounds. Usually SVG is Y-down, but MakerJs/GCode is Y-up.
+
+                // Let's check Layout in pipeline.ts: 
+                // bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
+                // In MakerJs (and math), typically Y is up. 
+                // However, let's verify context.
+                // In most drawing apps "Top" margin implies reducing the upper bound of the drawing area.
+
+                // If Y is up (standard CNC/Math):
+                // Top margin reduces maxY.
+                // Bottom margin increases minY.
+
+                // If Y is down (SVG/Screen):
+                // Top margin increases minY.
+                // Bottom margin reduces maxY.
+
+                // The drawing-maker seems to generally operate in "standard" coordinates where (0,0) is bottom-left often, 
+                // but let's check config.gcode.invertY. 
+                // Default config has invertY: true. This suggests internal logic might be 0,0 top-left (screen) OR it just flips for GCode.
+
+                // Let's stick to logical "Top" = "Max Y" for drawing if we assume standard Cartesian. 
+                // Wait, if invertY is true for GCode, that means internal representation is likely Y-up or raw coordinates.
+                // In typical vector graphics (like Illustrator/Inkscape exporting to SVG), Y is down.
+                // But Maker.js defaults: "Maker.js uses a Cartesian coordinate system." (Y Up).
+
+                // So:
+                // Top (Max Y) -> subtract margin[0]
+                // Right (Max X) -> subtract margin[1]
+                // Bottom (Min Y) -> add margin[2]
+                // Left (Min X) -> add margin[3]
+
+                const [top, right, bottom, left] = margin;
+                maxY -= top;
+                maxX -= right;
+                minY += bottom;
+                minX += left;
+            } else {
+                const m = margin as number;
+                minX += m;
+                minY += m;
+                maxX -= m;
+                maxY -= m;
+            }
+        }
 
         const clipLine = (p1: MakerJs.IPoint, p2: MakerJs.IPoint): [MakerJs.IPoint, MakerJs.IPoint] | null => {
             let t0 = 0, t1 = 1;

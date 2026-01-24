@@ -19,12 +19,12 @@ export default function Sidebar() {
         <GCodeSettings />
       </CollapsibleSection>
 
-      <CollapsibleSection title="Global Settings" defaultExpanded={false}>
-        <GlobalControls />
-      </CollapsibleSection>
-
       <CollapsibleSection title="Layers" defaultExpanded={true} className="border-b-0">
         <LayersEditor />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Global Modifiers & Settings" defaultExpanded={true}>
+        <GlobalControls />
       </CollapsibleSection>
     </div>
   );

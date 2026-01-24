@@ -49,6 +49,11 @@ interface ConfigStore {
   updateParams: (updates: Partial<AppConfig['params']>) => void;
   updateStep: (index: number, updates: Partial<PipelineStep>) => void;
 
+  // Global steps actions
+  addGlobalStep: (step: PipelineStep) => void;
+  updateGlobalStep: (index: number, updates: Partial<PipelineStep>) => void;
+  removeGlobalStep: (index: number) => void;
+
   setConfig: (config: AppConfig) => void;
   reset: () => void;
 }
@@ -94,6 +99,44 @@ export const useConfigStore = create<ConfigStore>()(
             config: {
               ...state.config,
               params: { ...state.config.params, steps }
+            }
+          };
+        }),
+
+      addGlobalStep: (step) =>
+        set((state) => {
+          const globalSteps = state.config.params.globalSteps ? [...state.config.params.globalSteps] : [];
+          globalSteps.push(step);
+          return {
+            config: {
+              ...state.config,
+              params: { ...state.config.params, globalSteps }
+            }
+          };
+        }),
+
+      updateGlobalStep: (index, updates) =>
+        set((state) => {
+          const globalSteps = state.config.params.globalSteps ? [...state.config.params.globalSteps] : [];
+          if (globalSteps[index]) {
+            globalSteps[index] = { ...globalSteps[index], ...updates };
+          }
+          return {
+            config: {
+              ...state.config,
+              params: { ...state.config.params, globalSteps }
+            }
+          };
+        }),
+
+      removeGlobalStep: (index) =>
+        set((state) => {
+          const globalSteps = state.config.params.globalSteps ? [...state.config.params.globalSteps] : [];
+          globalSteps.splice(index, 1);
+          return {
+            config: {
+              ...state.config,
+              params: { ...state.config.params, globalSteps }
             }
           };
         }),

@@ -76,18 +76,70 @@ app.post('/api/preview', async (req, res) => {
             // New layer-aware rendering
             const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed);
 
+            // Container for global modifiers
+            let finalModel: MakerJs.IModel = { models: {} };
+            for (const [id, model] of layerModels) {
+                finalModel.models![id] = model;
+            }
+
+            // Apply global modifiers if present
+            if (previewConfig.params.globalSteps && previewConfig.params.globalSteps.length > 0) {
+                finalModel = await Pipeline.executeOnModel(finalModel, previewConfig.params.globalSteps, previewConfig.canvas, previewConfig.params.seed);
+            }
+
             // Build layer data map with colors for SVG export
             const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
-            for (const layer of layers) {
-                const model = layerModels.get(layer.id);
-                if (model) {
-                    layerData.set(layer.id, {
-                        model,
-                        color: layer.color || '#000000',
-                        opacity: layer.opacity,
-                        strokeWidth: layer.strokeWidth
-                    });
+
+            // If global modifiers were applied, finalModel might have changed structure.
+            // We try to find our layers back.
+            // If the structure is preserved (common case), finalModel.models keys will correspond to layer IDs.
+            if (finalModel.models) {
+                for (const layer of layers) {
+                    // We look for the layer ID in the modified model
+                    // OR we iterate what's in finalModel.models and try to match?
+                    // Let's assume ID preservation for now.
+                    // If a modifier duplicates (e.g. array), new IDs are generated. 
+                    // We might handle that later. For now, we just render what we find that matches known layers 
+                    // OR we render everything if structure changed?
+
+                    // Simple approach: Map known layers.
+                    if (finalModel.models[layer.id]) {
+                        layerData.set(layer.id, {
+                            model: finalModel.models[layer.id],
+                            color: layer.color || '#000000',
+                            opacity: layer.opacity,
+                            strokeWidth: layer.strokeWidth
+                        });
+                    }
                 }
+
+                // If we possess models that are NOT in layers (e.g. from Array/Duplicate modifier on global level),
+                // we should render them too with a default color?
+                // For global modifiers, usually we want to treat the result as "the drawing".
+                // If global modifiers are used, maybe we should just render everything in `finalModel`.
+
+                // Let's iterate finalModel.models
+                for (const key in finalModel.models) {
+                    if (!layerData.has(key)) {
+                        // It's a new sub-model (maybe from array/duplicate)
+                        // Inherit color from parent or default?
+                        // Hard to know which layer it came from if renamed.
+                        // Default to black.
+                        layerData.set(key, {
+                            model: finalModel.models[key],
+                            color: '#000000',
+                            opacity: 1,
+                            strokeWidth: 1
+                        });
+                    }
+                }
+            } else {
+                // The model might have been flattened to paths?
+                // If so, treat as "base" layer.
+                layerData.set('combined', {
+                    model: finalModel,
+                    color: '#000000'
+                });
             }
 
             const svg = layersToSVG(layerData, previewConfig.canvas);
@@ -162,21 +214,63 @@ app.post('/api/export', async (req, res) => {
                 res.json({ layers: layerExports });
             } else {
                 // Export combined (default)
+                // Export combined (default)
                 const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
-                for (const layer of layers) {
-                    const model = layerModels.get(layer.id);
-                    if (model) {
-                        layerData.set(layer.id, {
-                            model,
-                            color: layer.color || '#000000',
-                            opacity: layer.opacity,
-                            strokeWidth: layer.strokeWidth
-                        });
+
+                // Container for global modifiers
+                let finalModel: MakerJs.IModel = { models: {} };
+                for (const [id, model] of layerModels) {
+                    finalModel.models![id] = model;
+                }
+
+                // Apply global modifiers if present
+                if (config.params.globalSteps && config.params.globalSteps.length > 0) {
+                    finalModel = await Pipeline.executeOnModel(finalModel, config.params.globalSteps, config.canvas, config.params.seed);
+                }
+
+                // Reconstruct layer data from final model
+                if (finalModel.models) {
+                    for (const layer of layers) {
+                        if (finalModel.models[layer.id]) {
+                            layerData.set(layer.id, {
+                                model: finalModel.models[layer.id],
+                                color: layer.color || '#000000',
+                                opacity: layer.opacity,
+                                strokeWidth: layer.strokeWidth
+                            });
+                        }
                     }
+                    // Add any extra models created by global modifiers
+                    for (const key in finalModel.models) {
+                        if (!layerData.has(key)) {
+                            layerData.set(key, {
+                                model: finalModel.models[key],
+                                color: '#000000',
+                                opacity: 1,
+                                strokeWidth: 1
+                            });
+                        }
+                    }
+                } else {
+                    // Flattened or simple model
+                    layerData.set('combined', {
+                        model: finalModel,
+                        color: '#000000'
+                    });
                 }
 
                 const svg = layersToSVG(layerData, config.canvas);
-                const gcode = generateGCodeForLayers(layerModels, config, config.gcode.postProcessor || 'standard');
+
+                // For GCode, we should probably use the finalModel directly if we want a single file
+                // But generateGCodeForLayers expects a Map.
+                // We can use the reconstructed layerData map (which contains models).
+                // Convert layerData values back to Map<string, IModel>
+                const gcodeModels = new Map<string, MakerJs.IModel>();
+                layerData.forEach((val, key) => gcodeModels.set(key, val.model));
+
+                const gcode = generateGCodeForLayers(gcodeModels, config, config.gcode.postProcessor || 'standard');
+
+                res.json({ svg, gcode });
 
                 res.json({ svg, gcode });
             }
@@ -202,7 +296,7 @@ if (!fs.existsSync(SKETCHES_DIR)) {
 // API: Save sketch
 app.post('/api/save', async (req, res) => {
     try {
-        const { filename, config } = req.body;
+        const { filename, config, overwrite } = req.body;
         if (!filename || !config) {
             return res.status(400).json({ error: 'Filename and config are required' });
         }
@@ -211,8 +305,8 @@ app.post('/api/save', async (req, res) => {
         let safeFilename = `${baseName}.json`;
         let filePath = path.join(SKETCHES_DIR, safeFilename);
 
-        // Auto-increment if file exists
-        if (fs.existsSync(filePath)) {
+        // Auto-increment if file exists AND overwrite is not true
+        if (fs.existsSync(filePath) && !overwrite) {
             let counter = 1;
             while (true) {
                 const nextName = `${baseName}${counter}.json`;

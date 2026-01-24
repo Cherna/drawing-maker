@@ -73,6 +73,7 @@ export interface PipelineParams {
     seed?: number;                // Global seed for reproducibility
     layers?: Layer[];             // Array of layer objects (new layer system)
     activeLayerId?: string;       // Currently selected layer in UI
+    globalSteps?: PipelineStep[]; // Steps applied after merging all layers
 }
 
 export interface GCodeConfig {

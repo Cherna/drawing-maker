@@ -126,7 +126,17 @@ const MODIFIERS: Record<string, ModifierFn> = {
     },
 
     'clip': (model, params, ctx, bounds) => {
-        Effects.clip(model, bounds);
+        // Check if any margin param is set
+        const hasMargin = params.top || params.right || params.bottom || params.left || params.margin;
+
+        const margin = hasMargin ? [
+            Number(params.top) || 0,
+            Number(params.right) || 0,
+            Number(params.bottom) || 0,
+            Number(params.left) || 0
+        ] as [number, number, number, number] : undefined;
+
+        Effects.clip(model, bounds, margin);
     },
 
     'noise': (model, params, ctx, bounds, mask) => {
@@ -642,5 +652,33 @@ export class Pipeline {
         }
 
         return result;
+    }
+
+
+    /**
+     * Apply a pipeline of steps to an existing model.
+     * Useful for global modifiers.
+     */
+    static async executeOnModel(model: MakerJs.IModel, steps: PipelineStep[], ctx: CanvasConfig, globalSeed?: number): Promise<MakerJs.IModel> {
+        let currentModel = model;
+        const bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
+        const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
+
+        for (const step of steps) {
+            if (step.enabled === false) continue;
+            console.log(`Pipeline (Global): Executing ${step.tool}...`);
+
+            if (MODIFIERS[step.tool]) {
+                const stepSeed = step.params?.seed ?? globalSeed;
+                const maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
+                const result = await MODIFIERS[step.tool](currentModel, step.params || {}, ctx, localBounds, maskFn);
+
+                if (result) {
+                    currentModel = result;
+                }
+            }
+        }
+
+        return currentModel;
     }
 }
