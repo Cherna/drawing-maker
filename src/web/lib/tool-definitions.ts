@@ -213,6 +213,26 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         default: 10,
         showIf: (p) => ['marble'].includes(p.type)
       },
+      {
+        key: 'offsetX',
+        label: 'Offset X',
+        type: 'number',
+        min: -500,
+        max: 500,
+        step: 0.1,
+        default: 0,
+        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+      },
+      {
+        key: 'offsetY',
+        label: 'Offset Y',
+        type: 'number',
+        min: -500,
+        max: 500,
+        step: 0.1,
+        default: 0,
+        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+      },
       { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 99999, step: 1 },
     ],
   },

@@ -83,6 +83,7 @@ export interface GCodeConfig {
     postProcessor?: 'standard' | 'linuxcnc' | 'reprap';
     useArcs?: boolean;           // Use G2/G3 for circular paths (default: false)
     optimizePaths?: boolean;      // Sort paths to minimize travel (default: false)
+    joinTolerance?: number;      // Distance in mm to merge adjacent paths (default: 0.1)
     dwellTime?: number;          // Pause in ms after Z-down (default: 0)
     invertX?: boolean;           // Invert X axis (positive becomes negative)
     invertY?: boolean;           // Invert Y axis (positive becomes negative)

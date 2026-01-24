@@ -3,7 +3,7 @@ import Sidebar from './Sidebar';
 import { cn } from '../lib/utils';
 
 export default function ResizableSidebar() {
-  const [width, setWidth] = useState(450); // Increased default width for better fit
+  const [width, setWidth] = useState(600); // Increased default width for better fit
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -17,8 +17,8 @@ export default function ResizableSidebar() {
       if (!isResizing) return;
 
       const newWidth = e.clientX;
-      // Min width 250px, max width 800px
-      const clampedWidth = Math.max(400, Math.min(800, newWidth));
+      // Min width 400px, max width 1200px
+      const clampedWidth = Math.max(400, Math.min(1200, newWidth));
       setWidth(clampedWidth);
     };
 

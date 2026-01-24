@@ -80,7 +80,7 @@
       {
         "tool": "noise",
         "params": {
-          "scale": 0.019,
+          "scale": 0.015,
           "magnitude": 5,
           "lacunarity": 4,
           "persistence": 1
@@ -163,7 +163,7 @@
           {
             "tool": "noise",
             "params": {
-              "scale": 0.019,
+              "scale": 0.015,
               "magnitude": 5,
               "lacunarity": 4,
               "persistence": 1
@@ -188,6 +188,6 @@
         "strokeWidth": 0.4
       }
     ],
-    "activeLayerId": "base"
+    "activeLayerId": "layer_1"
   }
 }

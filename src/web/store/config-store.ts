@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { AppConfig } from '../../types';
+import { AppConfig, PipelineStep } from '../../types';
 
 const defaultConfig: AppConfig = {
   sketch: 'pipeline',
@@ -18,6 +18,7 @@ const defaultConfig: AppConfig = {
     invertX: false,
     invertY: true,
     optimizePaths: true,
+    joinTolerance: 0.1,
   },
   params: {
     seed: Math.floor(Math.random() * 10000),
@@ -45,38 +46,61 @@ interface ConfigStore {
   updateCanvas: (updates: Partial<AppConfig['canvas']>) => void;
   updateGCode: (updates: Partial<AppConfig['gcode']>) => void;
   updateParams: (updates: Partial<AppConfig['params']>) => void;
+  updateStep: (index: number, updates: Partial<PipelineStep>) => void;
 
   setConfig: (config: AppConfig) => void;
   reset: () => void;
 }
 
-export const useConfigStore = create<ConfigStore>((set) => ({
-  config: defaultConfig,
-  updateConfig: (updates) =>
-    set((state) => ({
-      config: { ...state.config, ...updates },
-    })),
-  updateCanvas: (updates) =>
-    set((state) => ({
-      config: {
-        ...state.config,
-        canvas: { ...state.config.canvas, ...updates },
-      },
-    })),
-  updateGCode: (updates) =>
-    set((state) => ({
-      config: {
-        ...state.config,
-        gcode: { ...state.config.gcode, ...updates },
-      },
-    })),
-  updateParams: (updates) =>
-    set((state) => ({
-      config: {
-        ...state.config,
-        params: { ...state.config.params, ...updates },
-      },
-    })),
-  setConfig: (config) => set({ config }),
-  reset: () => set({ config: defaultConfig }),
-}));
+import { temporal } from 'zundo';
+
+export const useConfigStore = create<ConfigStore>()(
+  temporal(
+    (set) => ({
+      config: defaultConfig,
+      updateConfig: (updates) =>
+        set((state) => ({
+          config: { ...state.config, ...updates },
+        })),
+      updateCanvas: (updates) =>
+        set((state) => ({
+          config: {
+            ...state.config,
+            canvas: { ...state.config.canvas, ...updates },
+          },
+        })),
+      updateGCode: (updates) =>
+        set((state) => ({
+          config: {
+            ...state.config,
+            gcode: { ...state.config.gcode, ...updates },
+          },
+        })),
+      updateParams: (updates) =>
+        set((state) => ({
+          config: {
+            ...state.config,
+            params: { ...state.config.params, ...updates },
+          },
+        })),
+      updateStep: (index, updates) =>
+        set((state) => {
+          const steps = state.config.params.steps ? [...state.config.params.steps] : [];
+          if (steps[index]) {
+            steps[index] = { ...steps[index], ...updates };
+          }
+          return {
+            config: {
+              ...state.config,
+              params: { ...state.config.params, steps }
+            }
+          };
+        }),
+      setConfig: (config) => set({ config }),
+      reset: () => set({ config: defaultConfig }),
+    }),
+    {
+      limit: 20,
+    }
+  )
+);

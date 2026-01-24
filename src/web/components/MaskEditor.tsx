@@ -1,9 +1,14 @@
+import { useRef, useEffect, useState } from 'react';
 import { Label } from './ui/label';
 import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 import { Slider } from './ui/slider';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { RotateCcw } from 'lucide-react';
 import { PipelineStep, MaskConfig } from '../../types';
 import MaskPreview from './MaskPreview';
+import ScrubbableInput from './ui/scrubbable-input';
 
 const MASK_TYPES = [
   'radial',
@@ -120,8 +125,8 @@ export default function MaskEditor({ step, onChange }: MaskEditorProps) {
       <div className="space-y-4">
         {/* Contrast & Brightness Control (Soft Transition) */}
         <div className="grid grid-cols-2 gap-4">
-          {renderSlider("Contrast", mask.contrast ?? 1, 0, 5, 0.1, (v) => updateMaskOption('contrast', v))}
-          {renderSlider("Brightness", mask.brightness ?? 0, -1, 1, 0.05, (v) => updateMaskOption('brightness', v))}
+          <SliderControl label="Contrast" value={mask.contrast ?? 1} min={0} max={5} step={0.1} onChange={(v) => updateMaskOption('contrast', v)} defaultValue={1} />
+          <SliderControl label="Brightness" value={mask.brightness ?? 0} min={-1} max={1} step={0.05} onChange={(v) => updateMaskOption('brightness', v)} defaultValue={0} />
         </div>
 
         {/* Hard Cut Option */}
@@ -138,37 +143,42 @@ export default function MaskEditor({ step, onChange }: MaskEditorProps) {
             <Label htmlFor="hard-cut-toggle" className="text-xs cursor-pointer">Hard Cut (Remove Feathering)</Label>
           </div>
           {mask.threshold !== undefined && (
-            renderSlider("Cutoff", mask.threshold, 0, 1, 0.01, (v) => updateMaskOption('threshold', v))
+            <SliderControl label="Cutoff" value={mask.threshold} min={0} max={1} step={0.01} onChange={(v) => updateMaskOption('threshold', v)} defaultValue={0.5} />
           )}
         </div>
 
         {isPattern && (
           <>
             <div className="border-t border-border/50 pt-2" />
-            {renderSlider("Scale", mask.params.scale ?? 0.05, 0.001, 0.2, 0.001, (v) => updateMaskParam('scale', v))}
+            <SliderControl label="Scale" value={mask.params.scale ?? 0.05} min={0.0001} max={0.2} step={0.0001} onChange={(v) => updateMaskParam('scale', v)} defaultValue={0.05} />
+
+            <div className="grid grid-cols-2 gap-2">
+              <SliderControl label="Offset X" value={mask.params.offsetX ?? 0} min={-5000} max={5000} step={1} onChange={(v) => updateMaskParam('offsetX', v)} defaultValue={0} />
+              <SliderControl label="Offset Y" value={mask.params.offsetY ?? 0} min={-5000} max={5000} step={1} onChange={(v) => updateMaskParam('offsetY', v)} defaultValue={0} />
+            </div>
 
             {(mask.type === 'turbulence' || mask.type === 'marble') && (
-              renderSlider("Octaves", mask.params.octaves ?? 1, 1, 8, 1, (v) => updateMaskParam('octaves', v))
+              <SliderControl label="Octaves" value={mask.params.octaves ?? 1} min={1} max={8} step={1} onChange={(v) => updateMaskParam('octaves', v)} defaultValue={1} />
             )}
 
             {mask.type === 'marble' && (
-              renderSlider("Distortion", mask.params.distortion ?? 10, 0, 50, 1, (v) => updateMaskParam('distortion', v))
+              <SliderControl label="Distortion" value={mask.params.distortion ?? 10} min={0} max={50} step={1} onChange={(v) => updateMaskParam('distortion', v)} defaultValue={10} />
             )}
 
-            {renderSlider("Seed", mask.params.seed ?? 0, 0, 9999, 1, (v) => updateMaskParam('seed', v))}
+            <SliderControl label="Seed" value={mask.params.seed ?? 0} min={0} max={9999} step={1} onChange={(v) => updateMaskParam('seed', v)} defaultValue={0} />
           </>
         )}
 
         {mask.type === 'radial' && (
-          renderSlider("Radius", mask.params.radius ?? 0.5, 0, 1, 0.01, (v) => updateMaskParam('radius', v))
+          <SliderControl label="Radius" value={mask.params.radius ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => updateMaskParam('radius', v)} defaultValue={0.5} />
         )}
 
         {mask.type === 'border' && (
           <div className="grid grid-cols-2 gap-2">
-            {renderSlider("Top", mask.params.top ?? 0.1, 0, 0.5, 0.01, (v) => updateMaskParam('top', v))}
-            {renderSlider("Bottom", mask.params.bottom ?? 0.1, 0, 0.5, 0.01, (v) => updateMaskParam('bottom', v))}
-            {renderSlider("Left", mask.params.left ?? 0.1, 0, 0.5, 0.01, (v) => updateMaskParam('left', v))}
-            {renderSlider("Right", mask.params.right ?? 0.1, 0, 0.5, 0.01, (v) => updateMaskParam('right', v))}
+            <SliderControl label="Top" value={mask.params.top ?? 0.1} min={0} max={0.5} step={0.01} onChange={(v) => updateMaskParam('top', v)} defaultValue={0.1} />
+            <SliderControl label="Bottom" value={mask.params.bottom ?? 0.1} min={0} max={0.5} step={0.01} onChange={(v) => updateMaskParam('bottom', v)} defaultValue={0.1} />
+            <SliderControl label="Left" value={mask.params.left ?? 0.1} min={0} max={0.5} step={0.01} onChange={(v) => updateMaskParam('left', v)} defaultValue={0.1} />
+            <SliderControl label="Right" value={mask.params.right ?? 0.1} min={0} max={0.5} step={0.01} onChange={(v) => updateMaskParam('right', v)} defaultValue={0.1} />
           </div>
         )}
 
@@ -184,17 +194,61 @@ export default function MaskEditor({ step, onChange }: MaskEditorProps) {
           <MaskPreview mask={mask} />
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 
-function renderSlider(label: string, value: number, min: number, max: number, step: number, onChange: (val: number) => void) {
+interface SliderControlProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (val: number) => void;
+  defaultValue?: number;
+}
+
+function SliderControl({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  defaultValue
+}: SliderControlProps) {
+  const handleReset = () => {
+    if (defaultValue !== undefined) {
+      onChange(defaultValue);
+    }
+  };
+
   return (
     <div className="space-y-1">
-      <div className="flex justify-between">
-        <Label className="text-xs">{label}</Label>
-        <span className="text-xs text-muted-foreground w-12 text-right">{value.toFixed(step < 0.1 ? 3 : 1)}</span>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <ScrubbableInput
+            label={label}
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            onChange={onChange}
+          />
+        </div>
+        {defaultValue !== undefined && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 mb-[1px]" // Align with ScrubbableInput buttons
+            onClick={handleReset}
+            title={`Reset to ${defaultValue}`}
+          >
+            <RotateCcw className="h-3 w-3 text-muted-foreground" />
+          </Button>
+        )}
       </div>
+
       <Slider
         value={[value]}
         min={min}

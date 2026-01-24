@@ -225,10 +225,14 @@ const MODIFIERS: Record<string, ModifierFn> = {
                 distortion: params.distortion,
             };
 
+            const offsetX = params.offsetX || 0;
+            const offsetY = params.offsetY || 0;
+
             warpFn = (x, y) => {
-                const nx = patterns.get(noiseType as any, x, y, noiseParams);
+                const nx = patterns.get(noiseType as any, x + offsetX, y + offsetY, noiseParams);
                 // For Y displacement, sample from a different location to avoid correlated movement
-                const ny = patterns.get(noiseType as any, x + 1000, y + 1000, noiseParams);
+                // We also shift it by the offset (plus the hardcoded shift) so both axes move together
+                const ny = patterns.get(noiseType as any, x + offsetX + 1000, y + offsetY + 1000, noiseParams);
 
                 // Map 0..1 to -0.5..0.5 then scale
                 return {

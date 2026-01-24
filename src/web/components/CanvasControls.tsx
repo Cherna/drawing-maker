@@ -261,6 +261,25 @@ export function GCodeSettings() {
               Optimize path order (reduces travel)
             </Label>
           </div>
+
+          {gcode.optimizePaths && (
+            <div className="pl-6 space-y-1">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="join-tolerance" className="text-xs text-muted-foreground">Join Tolerance (mm)</Label>
+                <span className="text-[10px] text-muted-foreground">Max gap to bridge</span>
+              </div>
+              <Input
+                id="join-tolerance"
+                type="number"
+                min="0"
+                max="10"
+                step="0.01"
+                className="h-8"
+                value={gcode.joinTolerance ?? 0.1}
+                onChange={(e) => updateGCode({ joinTolerance: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+          )}
           <div className="flex items-center space-x-2">
             <Checkbox
               id="invert-x"

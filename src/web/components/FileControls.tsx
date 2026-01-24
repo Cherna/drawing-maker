@@ -27,14 +27,31 @@ export default function FileControls() {
     const performSave = async (filename: string) => {
         setIsLoading(true);
         try {
+            // Sanitize filename: ASCII alphanumeric, dot, dash, underscore only
+            let cleanName = filename.replace('.json', '');
+            cleanName = cleanName.replace(/[^a-zA-Z0-9\-\_\.]/g, '_');
+
+            if (!cleanName) {
+                alert('Invalid filename');
+                return false;
+            }
+
+            // Automatically update outputBaseName to match the filename
+            const updatedConfig = {
+                ...config,
+                outputBaseName: cleanName
+            };
+
             const res = await fetch('http://localhost:3000/api/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename, config }),
+                // Use sanitized name for saving
+                body: JSON.stringify({ filename: cleanName, config: updatedConfig }),
             });
             const data = await res.json();
             if (data.success) {
-                const cleanName = data.filename.replace('.json', '');
+                // Update local store with the new name
+                setConfig(updatedConfig);
                 setActiveFile(cleanName);
                 refreshSketches();
                 return true;

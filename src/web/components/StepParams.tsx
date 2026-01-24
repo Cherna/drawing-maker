@@ -192,7 +192,13 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
         <MaskEditor
           step={step}
           index={index}
-          onChange={(newMask) => updateParam('mask', newMask)}
+          onChange={(newMask) => {
+            if (onUpdate) {
+              onUpdate('mask', newMask);
+            } else {
+              storeUpdateStep(index, { mask: newMask });
+            }
+          }}
         />
       )}
     </div>

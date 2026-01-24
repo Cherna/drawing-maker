@@ -90,10 +90,29 @@ interface OptimizedChain {
  * Consolidate continuous paths by merging chains that connect end-to-end
  * This dramatically reduces fragmentation and travel moves
  */
-function consolidateContinuousPaths(chains: MakerJs.IChain[]): MakerJs.IChain[] {
+// Update optimizeChainOrder to accept tolerance
+function optimizeChainOrder(chains: MakerJs.IChain[], tolerance: number = 0.01): OptimizedChain[] {
+    if (chains.length <= 1) return chains.map(chain => ({ chain, reverse: false }));
+
+    // Step 1: Consolidate continuous paths
+    const consolidated = consolidateContinuousPaths(chains, tolerance);
+
+    // Step 2: Detect parallel line patterns
+    const parallelGroups = detectParallelLines(consolidated);
+
+    if (parallelGroups.length > 0) {
+        return optimizeParallelGroups(parallelGroups, consolidated);
+    }
+
+    // Step 3: Fallback to improved nearest-neighbor
+    return optimizeNearestNeighbor(consolidated);
+}
+
+// Update consolidateContinuousPaths signature
+function consolidateContinuousPaths(chains: MakerJs.IChain[], tolerance: number): MakerJs.IChain[] {
     if (chains.length <= 1) return chains;
 
-    const TOLERANCE = 0.01; // mm tolerance for endpoint matching
+    const TOLERANCE = tolerance; // mm tolerance for endpoint matching
 
     const getEndPoint = (chain: MakerJs.IChain): [number, number] => {
         if (chain.endless) {
@@ -159,7 +178,7 @@ function consolidateContinuousPaths(chains: MakerJs.IChain[]): MakerJs.IChain[] 
         consolidated.push(current);
     }
 
-    console.log(`[G-Code] Consolidated ${chains.length} chains into ${consolidated.length} continuous paths`);
+    console.log(`[G-Code] Consolidated ${chains.length} chains into ${consolidated.length} continuous paths (tolerance: ${tolerance}mm)`);
     return consolidated;
 }
 
@@ -268,11 +287,9 @@ function optimizeParallelGroups(parallelGroups: MakerJs.IChain[][], allChains: M
             const chain = group[i];
 
             // Alternate direction: even indices go forward, odd go backward
-            if (i % 2 === 1) {
-                MakerJs.chain.reverse(chain);
-            }
+            const shouldReverse = (i % 2 === 1);
 
-            result.push(chain);
+            result.push({ chain, reverse: shouldReverse });
             usedChains.add(chain);
         }
     }
@@ -365,25 +382,7 @@ function optimizeNearestNeighbor(chains: MakerJs.IChain[]): OptimizedChain[] {
     return optimized;
 }
 
-/**
- * Main optimization function with three-step approach
- */
-function optimizeChainOrder(chains: MakerJs.IChain[]): OptimizedChain[] {
-    if (chains.length <= 1) return chains.map(chain => ({ chain, reverse: false }));
-
-    // Step 1: Consolidate continuous paths
-    const consolidated = consolidateContinuousPaths(chains);
-
-    // Step 2: Detect parallel line patterns
-    const parallelGroups = detectParallelLines(consolidated);
-
-    if (parallelGroups.length > 0) {
-        return optimizeParallelGroups(parallelGroups, consolidated);
-    }
-
-    // Step 3: Fallback to improved nearest-neighbor
-    return optimizeNearestNeighbor(consolidated);
-}
+// ... (Updating exports to pass config.gcode.joinTolerance)
 
 export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: PostProcessorType = 'standard'): string {
     try {
@@ -403,7 +402,7 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         let optimizedChains: OptimizedChain[];
         if (config.gcode.optimizePaths) {
             console.log('[G-Code] Optimizing path order...');
-            optimizedChains = optimizeChainOrder(chains);
+            optimizedChains = optimizeChainOrder(chains, config.gcode.joinTolerance || 0.01);
         } else {
             optimizedChains = chains.map(chain => ({ chain, reverse: false }));
         }
@@ -483,13 +482,25 @@ export function generateGCodeForLayers(
 
                 let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
 
+                let optimizedChains: OptimizedChain[];
                 if (config.gcode.optimizePaths) {
-                    chains = optimizeChainOrder(chains);
+                    optimizedChains = optimizeChainOrder(chains, config.gcode.joinTolerance || 0.01);
+                } else {
+                    optimizedChains = chains.map(chain => ({ chain, reverse: false }));
                 }
 
-                chains.forEach((chain: MakerJs.IChain) => {
-                    const start = chain.links[0].walkedPath.pathContext.origin;
-                    if (!start) return;
+                optimizedChains.forEach((optimized: OptimizedChain) => {
+                    // Extract points from chain
+                    let points = MakerJs.chain.toKeyPoints(optimized.chain, 1.0);
+
+                    // Reverse the POINTS array if needed
+                    if (optimized.reverse) {
+                        points = points.reverse();
+                    }
+
+                    if (points.length === 0) return;
+
+                    const start = points[0];
 
                     lines.push(post.formatTravel(transformX(start[0]), transformY(start[1]), config.gcode.travelRate));
                     lines.push(`G1 Z${config.gcode.zDown} F${config.gcode.feedRate}`);
@@ -498,7 +509,7 @@ export function generateGCodeForLayers(
                         lines.push(post.formatDwell(config.gcode.dwellTime));
                     }
 
-                    const points = MakerJs.chain.toKeyPoints(chain, 1.0);
+                    // Draw through remaining points
                     for (let i = 1; i < points.length; i++) {
                         lines.push(post.formatMove(transformX(points[i][0]), transformY(points[i][1])));
                     }

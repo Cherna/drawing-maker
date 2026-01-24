@@ -57,7 +57,7 @@ export default function LayerStepItem({
   const availableTools = isGenerator ? GENERATORS : MODIFIERS;
 
   return (
-    <Card className={cn('relative', isLayer && 'border-primary/50')}>
+    <Card className={cn('relative mb-3 border-2 shadow-sm transition-all hover:border-primary/20', isLayer ? 'border-primary/60 bg-secondary/20' : 'bg-secondary/30')}>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Button
