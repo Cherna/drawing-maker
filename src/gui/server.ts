@@ -272,7 +272,7 @@ app.post('/api/export', async (req, res) => {
 
                 res.json({ svg, gcode });
 
-                res.json({ svg, gcode });
+
             }
         } else {
             // Backward compatibility: use old pipeline for non-layered configs

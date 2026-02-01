@@ -173,13 +173,7 @@ export default function FileControls() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => {
-                        if (activeFile) {
-                            performSave(activeFile);
-                        } else {
-                            handleSaveAs();
-                        }
-                    }}
+                    onClick={handleSave}
                     disabled={isLoading}
                     title={activeFile ? `Save "${activeFile}" (Ctrl+S)` : "Save (Ctrl+S)"}
                 >

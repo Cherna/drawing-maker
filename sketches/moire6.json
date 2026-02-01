@@ -1,6 +1,6 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "drawing",
+  "outputBaseName": "moire6",
   "canvas": {
     "width": 420,
     "height": 297,
@@ -12,13 +12,13 @@
     ]
   },
   "gcode": {
-    "feedRate": 1000,
-    "zUp": 5,
-    "zDown": -2,
+    "feedRate": 2500,
+    "zUp": 2,
+    "zDown": -0.5,
     "postProcessor": "linuxcnc",
     "useArcs": true,
     "optimizePaths": true,
-    "dwellTime": 20,
+    "dwellTime": 0,
     "travelRate": 3500,
     "invertY": true
   },

@@ -14,13 +14,15 @@
   "gcode": {
     "feedRate": 2000,
     "travelRate": 3500,
-    "zUp": 5,
-    "zDown": 0,
+    "zUp": 2,
+    "zDown": -0.5,
     "postProcessor": "linuxcnc",
     "invertX": false,
     "invertY": true,
     "optimizePaths": true,
-    "joinTolerance": 0.1
+    "joinTolerance": 0.1,
+    "useArcs": true,
+    "dwellTime": 5
   },
   "params": {
     "seed": 5697,
