@@ -3,9 +3,11 @@ import { createNoise2D } from 'simplex-noise';
 import { Transformer } from '../core/transformer';
 
 // Seeded random number generator (mulberry32)
+// Seeded random number generator (mulberry32)
 function seededRandom(seed: number) {
+    let state = Number(seed);
     return function () {
-        let t = seed += 0x6D2B79F5;
+        let t = state += 0x6D2B79F5;
         t = Math.imul(t ^ t >>> 15, t | 1);
         t ^= t + Math.imul(t ^ t >>> 7, t | 61);
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
@@ -134,7 +136,10 @@ export class Effects {
 
         const filterPaths = (m: MakerJs.IModel) => {
             if (m.paths) {
-                for (const [id, path] of Object.entries(m.paths)) {
+                // Sort keys for determinism
+                const keys = Object.keys(m.paths).sort();
+                for (const id of keys) {
+                    const path = m.paths[id];
                     const extents = MakerJs.measure.pathExtents(path);
                     const mid = [
                         (extents.low[0] + extents.high[0]) / 2,
@@ -151,8 +156,9 @@ export class Effects {
                 }
             }
             if (m.models) {
-                for (const child of Object.values(m.models)) {
-                    filterPaths(child);
+                const keys = Object.keys(m.models).sort();
+                for (const key of keys) {
+                    filterPaths(m.models[key]);
                 }
             }
         };
@@ -194,7 +200,9 @@ export class Effects {
         // For now, just filter out very short segments
         const filterShort = (m: MakerJs.IModel) => {
             if (m.paths) {
-                for (const [id, path] of Object.entries(m.paths)) {
+                const keys = Object.keys(m.paths).sort();
+                for (const id of keys) {
+                    const path = m.paths[id];
                     if (path.type === 'line') {
                         const line = path as MakerJs.IPathLine;
                         const len = Math.hypot(
@@ -208,8 +216,9 @@ export class Effects {
                 }
             }
             if (m.models) {
-                for (const child of Object.values(m.models)) {
-                    filterShort(child);
+                const keys = Object.keys(m.models).sort();
+                for (const key of keys) {
+                    filterShort(m.models[key]);
                 }
             }
         };

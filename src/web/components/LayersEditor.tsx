@@ -159,7 +159,7 @@ export default function LayersEditor() {
   };
 
   const handleCreateLayer = () => {
-    const newLayerId = `layer_${layers.length}`;
+    const newLayerId = `layer_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     // Assign a color from the palette, cycling through if needed
     const colorIndex = layers.length % DEFAULT_COLORS.length;
     const newLayer: Layer = {
@@ -187,7 +187,7 @@ export default function LayersEditor() {
   const handleDuplicateLayer = () => {
     if (!activeLayer) return;
 
-    const newLayerId = `layer_${layers.length}`;
+    const newLayerId = `layer_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newLayer: Layer = {
       id: newLayerId,
       name: `${activeLayer.name} Copy`,

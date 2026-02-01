@@ -96,15 +96,17 @@ export class Transformer {
         const traverse = (m: MakerJs.IModel, target: MakerJs.IModel) => {
             if (m.paths) {
                 target.models = target.models || {};
-                for (const [id, p] of Object.entries(m.paths)) {
-                    target.models[`resample_${id}`] = processPath(p);
+                const keys = Object.keys(m.paths).sort();
+                for (const id of keys) {
+                    target.models[`resample_${id}`] = processPath(m.paths[id]);
                 }
             }
             if (m.models) {
                 target.models = target.models || {};
-                for (const [id, child] of Object.entries(m.models)) {
+                const keys = Object.keys(m.models).sort();
+                for (const id of keys) {
                     target.models[id] = {};
-                    traverse(child, target.models[id]!);
+                    traverse(m.models[id], target.models[id]!);
                 }
             }
         };
