@@ -39,7 +39,7 @@ export default function Header() {
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
       <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold">🎨 Drawing Maker</h1>
+        <h1 className="text-2xl font-bold">DRWNG MKER</h1>
         <div className="flex items-center gap-1 border-l border-border pl-4">
           <Button
             variant="ghost"
