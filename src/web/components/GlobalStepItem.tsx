@@ -6,7 +6,7 @@ import { useConfigStore } from '../store/config-store';
 import { PipelineStep } from '../../types';
 import { TOOL_DEFINITIONS, MODIFIERS } from '../lib/tool-definitions';
 import StepParams from './StepParams';
-import { X, ChevronUp, ChevronDown, Copy } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, Copy, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface GlobalStepItemProps {
@@ -99,6 +99,19 @@ export default function GlobalStepItem({ step, index }: GlobalStepItemProps) {
                         </SelectContent>
                     </Select>
                     <div className="flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => updateGlobalStep(index, { enabled: step.enabled === false })}
+                            title={step.enabled === false ? "Enable step" : "Mute step"}
+                        >
+                            {step.enabled === false ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                                <Eye className="h-4 w-4" />
+                            )}
+                        </Button>
                         <Button
                             variant="ghost"
                             size="icon"

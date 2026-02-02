@@ -94,7 +94,12 @@ export class NoisePatterns {
 
     // Cellular / Voronoi (distance to closest point)
     // Basic implementation using a grid
-    cells(x: number, y: number, scale: number): number {
+    cells(x: number, y: number, scale: number, seed: number = 0): number {
+        // Debug: log first call to verify seed is being used
+        if (x === 0 && y === 0) {
+            console.log('[NoisePatterns.cells] seed:', seed);
+        }
+
         const s = scale * 0.5; // Adjust scale to match others roughly
         const xi = Math.floor(x * s);
         const yi = Math.floor(y * s);
@@ -109,8 +114,8 @@ export class NoisePatterns {
                 // Random point inside the neighbor cell
                 // We use our seeded RNG, but we need it to be deterministic per cell coordinates.
                 // A simple hash function allows random access:
-                const pointX = neighborX + this.pseudoRandom(neighborX, neighborY);
-                const pointY = neighborY + this.pseudoRandom(neighborY, neighborX + 1000); // reuse/offset
+                const pointX = neighborX + this.pseudoRandom(neighborX, neighborY, seed);
+                const pointY = neighborY + this.pseudoRandom(neighborY, neighborX + 1000, seed); // reuse/offset
 
                 const dist = Math.hypot((x * s) - pointX, (y * s) - pointY);
                 minDist = Math.min(minDist, dist);
@@ -120,14 +125,19 @@ export class NoisePatterns {
         return Math.min(1, minDist); // Distance field
     }
 
-    // Deterministic pseudo-random float [0, 1] from inputs
-    private pseudoRandom(x: number, y: number): number {
-        let n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123;
-        return n - Math.floor(n);
+    // Deterministic pseudo-random float [0, 1] from inputs including seed
+    // Using a better hash that's more sensitive to seed changes
+    private pseudoRandom(x: number, y: number, seed: number = 0): number {
+        // Mix all inputs together with large prime multipliers
+        let hash = x * 374761393 + y * 668265263 + seed * 1911520717;
+        hash = (hash ^ (hash >>> 13)) * 1274126177;
+        hash = hash ^ (hash >>> 16);
+        // Convert to [0, 1]
+        return Math.abs(hash % 10000) / 10000;
     }
 
     // General access
-    get(type: NoiseType, x: number, y: number, params: NoiseParams): number {
+    get(type: NoiseType, x: number, y: number, params: NoiseParams, seed?: number): number {
         switch (type) {
             case 'simplex':
             case 'perlin': // Simplex is often used as better Perlin
@@ -137,7 +147,7 @@ export class NoisePatterns {
             case 'marble':
                 return this.marble(x, y, params);
             case 'cells':
-                return this.cells(x, y, params.scale);
+                return this.cells(x, y, params.scale, seed ?? 0);
             default:
                 return (this.simplex(x, y, params.scale) + 1) / 2;
         }

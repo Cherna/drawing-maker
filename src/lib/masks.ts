@@ -220,7 +220,7 @@ export class Masks {
             // Wait, patterns.get does: this.noise2D(x * scale, y * scale).
             // So if we simply add to x: patterns.get(x + offsetX, ...) -> noise((x + offsetX) * scale)
             // This is correct for "moving the origin".
-            return patterns.get(targetType as any, x + offsetX, y + offsetY, noiseParams);
+            return patterns.get(targetType as any, x + offsetX, y + offsetY, noiseParams, seed);
         };
     }
 

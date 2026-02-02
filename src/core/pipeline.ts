@@ -231,7 +231,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
         // Check if it's a noise type
         if (['simplex', 'perlin', 'turbulence', 'marble', 'cells'].includes(type) || type === 'noise') {
             const noiseType = type === 'noise' ? 'simplex' : type;
-            const patterns = new NoisePatterns(params.seed || Date.now());
+            const patterns = new NoisePatterns(params.seed ?? Date.now());
             const noiseParams: NoiseParams = {
                 scale: params.frequency || params.scale || 0.05, // Map frequency to scale for noise
                 octaves: params.octaves || 1,
@@ -244,10 +244,10 @@ const MODIFIERS: Record<string, ModifierFn> = {
             const offsetY = params.offsetY || 0;
 
             warpFn = (x, y) => {
-                const nx = patterns.get(noiseType as any, x + offsetX, y + offsetY, noiseParams);
+                const nx = patterns.get(noiseType as any, x + offsetX, y + offsetY, noiseParams, params.seed ?? 0);
                 // For Y displacement, sample from a different location to avoid correlated movement
                 // We also shift it by the offset (plus the hardcoded shift) so both axes move together
-                const ny = patterns.get(noiseType as any, x + offsetX + 1000, y + offsetY + 1000, noiseParams);
+                const ny = patterns.get(noiseType as any, x + offsetX + 1000, y + offsetY + 1000, noiseParams, params.seed ?? 0);
 
                 // Map 0..1 to -0.5..0.5 then scale
                 return {

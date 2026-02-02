@@ -26,7 +26,7 @@ export default function MaskPreview({ mask, width = 150, height = 150 }: MaskPre
         // We handle errors gracefully if mask creation fails
         let maskFn: ((x: number, y: number) => number) | null = null;
         try {
-            maskFn = Masks.create(mask, bounds, Date.now());
+            maskFn = Masks.create(mask, bounds, mask.params?.seed);
         } catch (e) {
             console.error("Failed to create mask preview:", e);
         }

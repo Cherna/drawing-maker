@@ -1,14 +1,14 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "test7",
+  "outputBaseName": "test9",
   "canvas": {
     "height": 297,
     "width": 420,
     "margin": [
-      80,
-      80,
-      80,
-      80
+      70,
+      60,
+      70,
+      60
     ]
   },
   "gcode": {
@@ -24,16 +24,16 @@
     "dwellTime": 0
   },
   "params": {
-    "seed": 4812,
+    "seed": 1146,
     "layers": [
       {
         "id": "base",
         "name": "Base Layer",
         "steps": [
           {
-            "tool": "stripes",
+            "tool": "vertical-stripes",
             "params": {
-              "lines": 160
+              "lines": 260
             }
           },
           {
@@ -45,16 +45,16 @@
           {
             "tool": "warp",
             "params": {
-              "type": "marble",
-              "strength": 1,
-              "frequency": 0.0015,
-              "octaves": 1,
-              "persistence": 0.5,
-              "lacunarity": 2,
-              "distortion": 29,
-              "offsetX": -21.5,
+              "type": "cells",
+              "strength": 7,
+              "frequency": 0.021,
+              "octaves": 2,
+              "persistence": 1,
+              "lacunarity": 3.2,
+              "distortion": 10,
+              "offsetX": 0,
               "offsetY": 0,
-              "seed": 0
+              "seed": 3
             }
           }
         ],
@@ -66,9 +66,9 @@
     "activeLayerId": "base",
     "steps": [
       {
-        "tool": "stripes",
+        "tool": "vertical-stripes",
         "params": {
-          "lines": 160
+          "lines": 260
         }
       },
       {
@@ -80,16 +80,16 @@
       {
         "tool": "warp",
         "params": {
-          "type": "marble",
-          "strength": 1,
-          "frequency": 0.0015,
-          "octaves": 1,
-          "persistence": 0.5,
-          "lacunarity": 2,
-          "distortion": 29,
-          "offsetX": -21.5,
+          "type": "cells",
+          "strength": 7,
+          "frequency": 0.021,
+          "octaves": 2,
+          "persistence": 1,
+          "lacunarity": 3.2,
+          "distortion": 10,
+          "offsetX": 0,
           "offsetY": 0,
-          "seed": 0
+          "seed": 3
         }
       }
     ],
@@ -97,10 +97,10 @@
       {
         "tool": "clip",
         "params": {
-          "top": 0,
-          "right": 1,
-          "bottom": 0,
-          "left": 1
+          "top": 3,
+          "right": 3,
+          "bottom": 3,
+          "left": 3
         }
       }
     ]

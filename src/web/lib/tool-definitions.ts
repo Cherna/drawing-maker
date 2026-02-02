@@ -133,7 +133,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     hasMask: true,
     deprecated: true,
     params: [
-      { key: 'scale', label: 'Scale', type: 'number', min: 0.001, max: 0.5, step: 0.001, default: 0.05 },
+      { key: 'scale', label: 'Scale', type: 'number', min: 0.0001, max: 0.5, step: 0.0001, default: 0.05 },
       { key: 'magnitude', label: 'Magnitude', type: 'number', min: 0, max: 50, step: 0.1, default: 5 },
       { key: 'axis', label: 'Axis', type: 'select', options: ['both', 'x', 'y'], default: 'both' },
       { key: 'octaves', label: 'Octaves', type: 'number', min: 1, max: 8, step: 1, default: 1 },
@@ -178,9 +178,9 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         key: 'frequency',
         label: 'Frequency / Scale',
         type: 'number',
-        min: 0.001,
+        min: 0.0001,
         max: 0.5,
-        step: 0.001,
+        step: 0.0001,
         default: 0.05,
         showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
       },

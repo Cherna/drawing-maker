@@ -157,14 +157,27 @@ export default function MaskEditor({ step, onChange }: MaskEditorProps) {
               <SliderControl label="Offset Y" value={mask.params.offsetY ?? 0} min={-5000} max={5000} step={1} onChange={(v) => updateMaskParam('offsetY', v)} defaultValue={0} />
             </div>
 
-            {(mask.type === 'turbulence' || mask.type === 'marble') && (
+            {/* Octaves - for noise types that support multi-octave FBM */}
+            {['simplex', 'perlin', 'turbulence', 'marble', 'cells'].includes(mask.type) && (
               <SliderControl label="Octaves" value={mask.params.octaves ?? 1} min={1} max={8} step={1} onChange={(v) => updateMaskParam('octaves', v)} defaultValue={1} />
             )}
 
+            {/* Persistence - amplitude decay for FBM */}
+            {['simplex', 'perlin', 'turbulence', 'marble'].includes(mask.type) && (
+              <SliderControl label="Persistence" value={mask.params.persistence ?? 0.5} min={0} max={1} step={0.05} onChange={(v) => updateMaskParam('persistence', v)} defaultValue={0.5} />
+            )}
+
+            {/* Lacunarity - frequency growth for FBM */}
+            {['simplex', 'perlin', 'turbulence', 'marble'].includes(mask.type) && (
+              <SliderControl label="Lacunarity" value={mask.params.lacunarity ?? 2} min={1} max={4} step={0.1} onChange={(v) => updateMaskParam('lacunarity', v)} defaultValue={2} />
+            )}
+
+            {/* Distortion - marble-specific parameter */}
             {mask.type === 'marble' && (
               <SliderControl label="Distortion" value={mask.params.distortion ?? 10} min={0} max={50} step={1} onChange={(v) => updateMaskParam('distortion', v)} defaultValue={10} />
             )}
 
+            {/* Seed - for all pattern types */}
             <SliderControl label="Seed" value={mask.params.seed ?? 0} min={0} max={9999} step={1} onChange={(v) => updateMaskParam('seed', v)} defaultValue={0} />
           </>
         )}
