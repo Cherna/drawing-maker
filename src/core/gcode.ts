@@ -392,8 +392,14 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         const lines: string[] = [...post.header];
 
         // Coordinate transformation helper
+        // First apply Y-flip to match SVG coordinate system (screen coords: Y+ down)
+        // Then optionally invert for machine compatibility
+        const canvasHeight = config.canvas.height;
         const transformX = (x: number) => config.gcode.invertX ? -x : x;
-        const transformY = (y: number) => config.gcode.invertY ? -y : y;
+        const transformY = (y: number) => {
+            const yFlipped = canvasHeight - y;  // Same as SVG: converts Cartesian Y+ (up) to screen Y+ (down)
+            return config.gcode.invertY ? -yFlipped : yFlipped;
+        };
 
         let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
         console.log(`[G-Code] Found ${chains.length} path chains`);
@@ -482,8 +488,14 @@ export function generateGCodeForLayers(
         const lines: string[] = [...post.header];
 
         // Coordinate transformation helper
+        // First apply Y-flip to match SVG coordinate system (screen coords: Y+ down)
+        // Then optionally invert for machine compatibility
+        const canvasHeight = config.canvas.height;
         const transformX = (x: number) => config.gcode.invertX ? -x : x;
-        const transformY = (y: number) => config.gcode.invertY ? -y : y;
+        const transformY = (y: number) => {
+            const yFlipped = canvasHeight - y;  // Same as SVG: converts Cartesian Y+ (up) to screen Y+ (down)
+            return config.gcode.invertY ? -yFlipped : yFlipped;
+        };
 
         layerModels.forEach((model, layerId) => {
             try {
