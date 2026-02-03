@@ -81,6 +81,7 @@ export interface GCodeConfig {
     travelRate: number;
     zUp: number;
     zDown: number;
+    zSafe?: number;              // Safe clearance height for long travels (default: 40mm)
     postProcessor?: 'standard' | 'linuxcnc' | 'reprap';
     useArcs?: boolean;           // Use G2/G3 for circular paths (default: false)
     optimizePaths?: boolean;      // Sort paths to minimize travel (default: false)

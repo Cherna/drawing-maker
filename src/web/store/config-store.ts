@@ -14,6 +14,7 @@ const defaultConfig: AppConfig = {
     travelRate: 3500,
     zUp: 2,
     zDown: -0.5,
+    zSafe: 40,
     postProcessor: 'linuxcnc',
     invertX: false,
     invertY: true,

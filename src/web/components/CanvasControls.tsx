@@ -236,6 +236,16 @@ export function GCodeSettings() {
             onChange={(val) => updateGCode({ zDown: val !== undefined ? val : 0 })}
           />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="z-safe">Z-Safe / Clearance (mm)</Label>
+          <ScrubbableInput
+            id="z-safe"
+            min={0}
+            max={100}
+            value={gcode.zSafe ?? 40}
+            onChange={(val) => updateGCode({ zSafe: val ?? 40 })}
+          />
+        </div>
 
         {/* Optimization Toggles */}
         <div className="col-span-2 space-y-3 pt-4 border-t border-border">

@@ -22,11 +22,11 @@ const POST_PROCESSORS: Record<PostProcessorType, (config: AppConfig) => PostProc
         header: [
             'G21', // mm
             'G90', // absolute positioning
-            `G0 Z${config.gcode.zUp} F${config.gcode.travelRate}`,
+            `G0 Z${config.gcode.zSafe ?? 40} F${config.gcode.travelRate}`, // Safe clearance height
             `G0 X0 Y0`,
         ],
         footer: [
-            `G0 Z${config.gcode.zUp} F${config.gcode.travelRate}`,
+            `G0 Z${config.gcode.zSafe ?? 40} F${config.gcode.travelRate}`, // Safe clearance height
             'G0 X0 Y0',
             'M2',
         ],
@@ -40,12 +40,12 @@ const POST_PROCESSORS: Record<PostProcessorType, (config: AppConfig) => PostProc
         header: [
             '%',
             'G17 G21 G90 G64 P0.1', // XY Plane, mm, Absolute, Constant Velocity with tolerance
-            `G0 Z${config.gcode.zUp}`,
+            `G0 Z${config.gcode.zSafe ?? 40}`, // Safe clearance height
             `G0 X0 Y0 F${config.gcode.travelRate}`,
             'M3 S1000', // Spindle On
         ],
         footer: [
-            `G0 Z${config.gcode.zUp}`,
+            `G0 Z${config.gcode.zSafe ?? 40}`, // Safe clearance height
             `G0 X0 Y0 F${config.gcode.travelRate}`,
             'M5',
             'M30',
@@ -62,10 +62,10 @@ const POST_PROCESSORS: Record<PostProcessorType, (config: AppConfig) => PostProc
             'G21',
             'G90',
             'M107',
-            `G0 Z${config.gcode.zUp} F${config.gcode.travelRate}`,
+            `G0 Z${config.gcode.zSafe ?? 40} F${config.gcode.travelRate}`, // Safe clearance height
         ],
         footer: [
-            `G0 Z${config.gcode.zUp}`,
+            `G0 Z${config.gcode.zSafe ?? 40}`, // Safe clearance height
             `G0 X0 Y0 F${config.gcode.travelRate}`,
             'M84',
         ],
