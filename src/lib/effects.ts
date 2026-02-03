@@ -266,6 +266,8 @@ export class Effects {
         let minY = bounds.y;
         let maxY = bounds.y + bounds.height;
 
+        console.log(`[CLIP DEBUG] Input bounds:`, bounds);
+
         // Apply margins if provided
         if (margin) {
             if (Array.isArray(margin)) {
@@ -371,7 +373,14 @@ export class Effects {
             }
         };
 
+        console.log(`[CLIP DEBUG] Final clip box: x[${minX}, ${maxX}] y[${minY}, ${maxY}]`);
+        const modelExtents = MakerJs.measure.modelExtents(model);
+        console.log(`[CLIP DEBUG] Model extents before clip:`, modelExtents);
+
         processModel(model);
+
+        const afterExtents = MakerJs.measure.modelExtents(model);
+        console.log(`[CLIP DEBUG] Model extents after clip:`, afterExtents);
         return model;
     }
 }
