@@ -136,7 +136,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
             Number(params.left) || 0
         ] as [number, number, number, number] : undefined;
 
-        Effects.clip(model, bounds, margin);
+        return Effects.clip(model, bounds, margin);
     },
 
     'noise': (model, params, ctx, bounds, mask) => {
@@ -656,14 +656,13 @@ export class Pipeline {
                 // it gets moved there.
                 const modelExtents = MakerJs.measure.modelExtents(currentModel);
                 if (modelExtents) {
-                    console.log(`[DEBUG] Before centering - Model extents:`, modelExtents);
+
                     const modelCenterX = (modelExtents.low[0] + modelExtents.high[0]) / 2;
                     const modelCenterY = (modelExtents.low[1] + modelExtents.high[1]) / 2;
 
                     const drawCenterX = bounds.x + bounds.width / 2;
                     const drawCenterY = bounds.y + bounds.height / 2;
-                    console.log(`[DEBUG] Draw center: (${drawCenterX}, ${drawCenterY})`);
-                    console.log(`[DEBUG] Model center before move: (${modelCenterX}, ${modelCenterY})`);
+
 
                     MakerJs.model.move(currentModel, [
                         drawCenterX - modelCenterX,
@@ -671,7 +670,7 @@ export class Pipeline {
                     ]);
 
                     const afterExtents = MakerJs.measure.modelExtents(currentModel);
-                    console.log(`[DEBUG] After centering - Model extents:`, afterExtents);
+
                 }
 
                 result.set(layer.id, currentModel);
@@ -698,7 +697,7 @@ export class Pipeline {
             if (MODIFIERS[step.tool]) {
                 const stepSeed = step.params?.seed ?? globalSeed;
                 const maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
-                const result = await MODIFIERS[step.tool](currentModel, step.params || {}, ctx, localBounds, maskFn);
+                const result = await MODIFIERS[step.tool](currentModel, step.params || {}, ctx, bounds, maskFn);
 
                 if (result) {
                     currentModel = result;

@@ -17,22 +17,18 @@ function App() {
   }, [debouncedConfig, refetch]);
 
   // Warn before closing/reloading if there are unsaved changes
+  const isDirty = useConfigStore((state) => state.isDirty);
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Only show warning if there's actual content (not just default/empty config)
-      const hasContent = config.params?.layers?.some(layer => layer.steps.length > 0) ||
-        config.params?.globalSteps?.length > 0;
-
-      if (hasContent) {
+      if (isDirty) {
         e.preventDefault();
-        // Modern browsers ignore custom message, but setting returnValue is required
         e.returnValue = '';
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [config]);
+  }, [isDirty]);
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">

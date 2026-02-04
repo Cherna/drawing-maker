@@ -44,6 +44,7 @@ const defaultConfig: AppConfig = {
 
 interface ConfigStore {
   config: AppConfig;
+  isDirty: boolean;
   updateConfig: (updates: Partial<AppConfig>) => void;
   updateCanvas: (updates: Partial<AppConfig['canvas']>) => void;
   updateGCode: (updates: Partial<AppConfig['gcode']>) => void;
@@ -56,6 +57,7 @@ interface ConfigStore {
   removeGlobalStep: (index: number) => void;
 
   setConfig: (config: AppConfig) => void;
+  markClean: () => void;
   reset: () => void;
 }
 
@@ -65,9 +67,11 @@ export const useConfigStore = create<ConfigStore>()(
   temporal(
     (set) => ({
       config: defaultConfig,
+      isDirty: false,
       updateConfig: (updates) =>
         set((state) => ({
           config: { ...state.config, ...updates },
+          isDirty: true,
         })),
       updateCanvas: (updates) =>
         set((state) => ({
@@ -75,6 +79,7 @@ export const useConfigStore = create<ConfigStore>()(
             ...state.config,
             canvas: { ...state.config.canvas, ...updates },
           },
+          isDirty: true,
         })),
       updateGCode: (updates) =>
         set((state) => ({
@@ -82,6 +87,7 @@ export const useConfigStore = create<ConfigStore>()(
             ...state.config,
             gcode: { ...state.config.gcode, ...updates },
           },
+          isDirty: true,
         })),
       updateParams: (updates) =>
         set((state) => ({
@@ -89,6 +95,7 @@ export const useConfigStore = create<ConfigStore>()(
             ...state.config,
             params: { ...state.config.params, ...updates },
           },
+          isDirty: true,
         })),
       updateStep: (index, updates) =>
         set((state) => {
@@ -100,7 +107,8 @@ export const useConfigStore = create<ConfigStore>()(
             config: {
               ...state.config,
               params: { ...state.config.params, steps }
-            }
+            },
+            isDirty: true,
           };
         }),
 
@@ -112,7 +120,8 @@ export const useConfigStore = create<ConfigStore>()(
             config: {
               ...state.config,
               params: { ...state.config.params, globalSteps }
-            }
+            },
+            isDirty: true,
           };
         }),
 
@@ -126,7 +135,8 @@ export const useConfigStore = create<ConfigStore>()(
             config: {
               ...state.config,
               params: { ...state.config.params, globalSteps }
-            }
+            },
+            isDirty: true,
           };
         }),
 
@@ -138,11 +148,13 @@ export const useConfigStore = create<ConfigStore>()(
             config: {
               ...state.config,
               params: { ...state.config.params, globalSteps }
-            }
+            },
+            isDirty: true,
           };
         }),
-      setConfig: (config) => set({ config }),
-      reset: () => set({ config: defaultConfig }),
+      setConfig: (config) => set({ config, isDirty: false }),
+      markClean: () => set({ isDirty: false }),
+      reset: () => set({ config: defaultConfig, isDirty: false }),
     }),
     {
       limit: 20,

@@ -1,6 +1,6 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "test",
+  "outputBaseName": "test11",
   "canvas": {
     "height": 297,
     "width": 420,
@@ -258,7 +258,7 @@
       {
         "tool": "clip",
         "params": {
-          "top": 5,
+          "top": 3,
           "right": 3,
           "bottom": 5,
           "left": 5

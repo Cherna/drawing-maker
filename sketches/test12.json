@@ -1,6 +1,6 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "test",
+  "outputBaseName": "test12",
   "canvas": {
     "height": 297,
     "width": 420,
@@ -94,7 +94,7 @@
           {
             "tool": "mirror",
             "params": {
-              "axis": "y",
+              "axis": "x",
               "center": false
             }
           }
@@ -171,7 +171,7 @@
       {
         "tool": "mirror",
         "params": {
-          "axis": "y",
+          "axis": "x",
           "center": false
         }
       }

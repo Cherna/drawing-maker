@@ -5,14 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Save, FolderOpen, FilePlus, RefreshCw, Trash2 } from 'lucide-react';
 
 export default function FileControls() {
-    const { config, setConfig } = useConfigStore();
+    const { config, setConfig, isDirty, markClean } = useConfigStore();
     const [activeFile, setActiveFile] = useState<string | null>(null);
     const [sketches, setSketches] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-
-    // Store the stringified version of the config when loaded/saved
-    // This allows us to check if the current state is truly different (dirty)
-    const [savedConfigStr, setSavedConfigStr] = useState<string>(JSON.stringify(config));
 
     const refreshSketches = useCallback(async () => {
         try {
@@ -49,22 +45,18 @@ export default function FileControls() {
             const res = await fetch('http://localhost:3000/api/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // Use sanitized name for saving
                 body: JSON.stringify({ filename: cleanName, config: updatedConfig, overwrite }),
             });
             const data = await res.json();
             if (data.success) {
-                // Update local store with the new name
                 setConfig(updatedConfig);
-                setActiveFile(cleanName); // Sets active file to the SAVED name (which might include increment if overwrite=false)
+                setActiveFile(cleanName);
 
-                // If we attempted to save as "foo" but got "foo1", activeFile becomes "foo1". This is correct.
                 if (data.filename) {
                     setActiveFile(data.filename.replace('.json', ''));
                 }
 
-                // Update saved state reference
-                setSavedConfigStr(JSON.stringify(updatedConfig));
+                markClean();
                 refreshSketches();
                 return true;
             }
@@ -79,7 +71,6 @@ export default function FileControls() {
 
     const handleSave = async () => {
         if (activeFile) {
-            // Implicit overwrite for "Save"
             await performSave(activeFile, true);
         } else {
             handleSaveAs();
@@ -89,7 +80,6 @@ export default function FileControls() {
     const handleSaveAs = async () => {
         const name = prompt('Save as...', activeFile || 'my-drawing');
         if (name) {
-            // "Save As" behavior per request: check bounds/append number -> overwrite=false
             await performSave(name, false);
         }
     };
@@ -106,8 +96,7 @@ export default function FileControls() {
             });
 
             if (res.ok) {
-                setActiveFile(null); // Clear active file as it's gone
-                // We don't reset config here, user might want to save it as something else
+                setActiveFile(null);
                 refreshSketches();
             } else {
                 throw new Error('Failed to delete');
@@ -121,10 +110,6 @@ export default function FileControls() {
     };
 
     const loadSketch = async (filename: string) => {
-        // Check if dirty
-        const currentConfigStr = JSON.stringify(config);
-        const isDirty = currentConfigStr !== savedConfigStr;
-
         if (isDirty) {
             if (!confirm(`Discard changes to "${activeFile || 'current sketch'}"?`)) return;
         }
@@ -142,10 +127,7 @@ export default function FileControls() {
                 temporal.getState().clear();
             }
 
-            // Filename from dropdown includes extension usually, but let's be safe
             setActiveFile(filename.replace('.json', ''));
-            // Update saved state reference
-            setSavedConfigStr(JSON.stringify(newConfig));
         } catch (e) {
             console.error('Failed to load sketch:', e);
             alert('Failed to load sketch');
@@ -200,7 +182,6 @@ export default function FileControls() {
                                 if (newName && newName !== activeFile) {
                                     const saved = await performSave(newName);
                                     if (saved) {
-                                        // Delete the old file
                                         setIsLoading(true);
                                         try {
                                             await fetch(`http://localhost:3000/api/sketches/${activeFile}.json`, {
