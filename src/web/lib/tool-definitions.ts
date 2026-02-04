@@ -102,6 +102,22 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'detail', label: 'Detail', type: 'number', min: 0.1, max: 20, step: 0.1, default: 1.0 },
     ],
   },
+  'glitch1': {
+    category: 'modifier',
+    label: 'Glitch 1',
+    params: [
+      { key: 'iterations', label: 'Iterations', type: 'number', min: 1, max: 20, step: 1, default: 1 },
+      { key: 'factor', label: 'Factor', type: 'number', min: 0.1, max: 1, step: 0.05, default: 0.5 },
+    ],
+  },
+  'glitch2': {
+    category: 'modifier',
+    label: 'Glitch 2',
+    params: [
+      { key: 'iterations', label: 'Iterations', type: 'number', min: 1, max: 20, step: 1, default: 3 },
+      { key: 'factor', label: 'Factor', type: 'number', min: 0.1, max: 2, step: 0.05, default: 0.5 },
+    ],
+  },
   'move': {
     category: 'modifier',
     label: 'Move',

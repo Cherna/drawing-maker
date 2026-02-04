@@ -13,15 +13,17 @@ export default function Preview({ svg, isLoading, error }: PreviewProps) {
     <div className="flex flex-1 flex-col overflow-hidden bg-muted/20">
       <div className="border-b border-border bg-card px-6 py-3">
         {/* ... header content ... */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Preview</h2>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between min-h-[24px]">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold">Preview</h2>
             {isLoading && (
-              <>
+              <div className="flex items-center gap-2 bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Generating...</span>
-              </>
+                <span className="font-medium text-xs">Generating...</span>
+              </div>
             )}
+          </div>
+          <div className="flex items-center gap-2 text-xs">
             {!isLoading && !error && svg && (
               <span className="text-green-600 dark:text-green-400">Ready</span>
             )}
@@ -38,7 +40,8 @@ export default function Preview({ svg, isLoading, error }: PreviewProps) {
       {/* Main content area - must fill remaining space */}
       <div className="flex-1 relative" style={{ minHeight: 0 }}>
         {/* ... loading/error states ... */}
-        {isLoading && (
+        {/* Loading spinner overlay - only show centered when no content yet */}
+        {isLoading && !svg && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -59,7 +62,8 @@ export default function Preview({ svg, isLoading, error }: PreviewProps) {
           </div>
         )}
 
-        {!isLoading && !error && svg && (
+        {/* Show content even while loading (non-blocking update) */}
+        {!error && svg && (
           <SVGCanvas svg={svg} />
         )}
 

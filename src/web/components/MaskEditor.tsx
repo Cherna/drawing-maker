@@ -183,7 +183,26 @@ export default function MaskEditor({ step, onChange }: MaskEditorProps) {
         )}
 
         {mask.type === 'radial' && (
-          <SliderControl label="Radius" value={mask.params.radius ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => updateMaskParam('radius', v)} defaultValue={0.5} />
+          <>
+            <SliderControl label="Radius" value={mask.params.radius ?? 0.5} min={0} max={2} step={0.01} onChange={(v) => updateMaskParam('radius', v)} defaultValue={0.5} />
+            <SliderControl label="Scale" value={mask.params.scale ?? 1} min={0.1} max={5} step={0.1} onChange={(v) => updateMaskParam('scale', v)} defaultValue={1} />
+            <div className="grid grid-cols-2 gap-2">
+              <SliderControl label="Offset X" value={mask.params.offsetX ?? 0} min={-500} max={500} step={1} onChange={(v) => updateMaskParam('offsetX', v)} defaultValue={0} />
+              <SliderControl label="Offset Y" value={mask.params.offsetY ?? 0} min={-500} max={500} step={1} onChange={(v) => updateMaskParam('offsetY', v)} defaultValue={0} />
+            </div>
+          </>
+        )}
+
+        {mask.type === 'checker' && (
+          <>
+            <SliderControl label="Scale" value={mask.params.scale ?? 0.1} min={0.0001} max={1} step={0.0001} onChange={(v) => updateMaskParam('scale', v)} defaultValue={0.1} />
+            <SliderControl label="Pattern Scale" value={mask.params.patternScale ?? 1} min={0.1} max={5} step={0.1} onChange={(v) => updateMaskParam('patternScale', v)} defaultValue={1} />
+            <div className="grid grid-cols-2 gap-2">
+              <SliderControl label="Offset X" value={mask.params.offsetX ?? 0} min={-500} max={500} step={1} onChange={(v) => updateMaskParam('offsetX', v)} defaultValue={0} />
+              <SliderControl label="Offset Y" value={mask.params.offsetY ?? 0} min={-500} max={500} step={1} onChange={(v) => updateMaskParam('offsetY', v)} defaultValue={0} />
+            </div>
+            <SliderControl label="Softness" value={mask.params.softness ?? 0} min={0} max={1} step={0.01} onChange={(v) => updateMaskParam('softness', v)} defaultValue={0} />
+          </>
         )}
 
         {mask.type === 'border' && (

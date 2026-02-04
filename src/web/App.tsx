@@ -10,7 +10,7 @@ function App() {
   const config = useConfigStore((state) => state.config);
   const debouncedConfig = useDebounce(config, 300);
 
-  const { data: preview, isLoading, error, refetch } = usePreview(debouncedConfig);
+  const { data: preview, isFetching, error, refetch } = usePreview(debouncedConfig);
 
   useEffect(() => {
     refetch();
@@ -35,7 +35,7 @@ function App() {
       <Header />
       <div className="flex flex-1 overflow-hidden">
         <ResizableSidebar />
-        <Preview svg={preview?.svg} isLoading={isLoading} error={error} />
+        <Preview svg={preview?.svg} isLoading={isFetching} error={error} />
       </div>
     </div>
   );

@@ -119,9 +119,21 @@ export class Masks {
      * Params: center [x, y] (0-1), radius (0-1), falloff ('linear' | 'smooth' | 'sharp')
      */
     static radial(params: any, bounds: Box): MaskFn {
-        const cx = bounds.x + (params.center?.[0] ?? 0.5) * bounds.width;
-        const cy = bounds.y + (params.center?.[1] ?? 0.5) * bounds.height;
-        const radius = (params.radius ?? 0.5) * Math.min(bounds.width, bounds.height);
+        // Scale controls size (1 = default, 2 = twice as large, 0.5 = half size)
+        const scale = params.scale ?? 1;
+        // Offset moves the pattern in canvas units (mm)
+        const offsetX = params.offsetX ?? 0;
+        const offsetY = params.offsetY ?? 0;
+
+        // Center position (0-1 normalized, then offset applied)
+        const baseCx = bounds.x + (params.center?.[0] ?? 0.5) * bounds.width;
+        const baseCy = bounds.y + (params.center?.[1] ?? 0.5) * bounds.height;
+        const cx = baseCx + offsetX;
+        const cy = baseCy + offsetY;
+
+        // Radius is scaled
+        const baseRadius = (params.radius ?? 0.5) * Math.min(bounds.width, bounds.height);
+        const radius = baseRadius * scale;
         const falloff = params.falloff ?? 'linear';
 
         return (x, y) => {
@@ -258,30 +270,68 @@ export class Masks {
 
     /**
      * Checker pattern mask - checkerboard grid
-     * Params: scale (size of squares), softness (0 = hard edges, 1 = gradient)
+     * Params: scale (size of squares), softness (0 = hard edges, 1 = gradient feathering)
      */
     static checker(params: any, bounds: Box): MaskFn {
-        const scaleX = params.scaleX ?? params.scale ?? 0.1;
-        const scaleY = params.scaleY ?? params.scale ?? 0.1;
+        // Scale controls checker size (higher = smaller squares, default 0.1)
+        const baseScaleX = params.scaleX ?? params.scale ?? 0.1;
+        const baseScaleY = params.scaleY ?? params.scale ?? 0.1;
+        // Pattern scale multiplier (1 = default, 2 = twice as dense, 0.5 = half)
+        const patternScale = params.patternScale ?? 1;
+        const scaleX = baseScaleX * patternScale;
+        const scaleY = baseScaleY * patternScale;
+        // Offset moves the pattern in canvas units (mm)
+        const offsetX = params.offsetX ?? 0;
+        const offsetY = params.offsetY ?? 0;
+        // Softness: 0 = hard edges, 1 = maximum feathering (gradient to edge)
         const softness = params.softness ?? 0;
 
         return (x, y) => {
-            const fx = x * scaleX;
-            const fy = y * scaleY;
+            // Apply offset before scaling
+            const fx = (x + offsetX) * scaleX;
+            const fy = (y + offsetY) * scaleY;
+
+            // Get which square we're in and position within that square (0-1)
+            const ix = Math.floor(fx);
+            const iy = Math.floor(fy);
+            const localX = fx - ix; // 0-1 within the square
+            const localY = fy - iy; // 0-1 within the square
+
+            // Base checker value (0 or 1)
+            const isWhite = (ix + iy) % 2 === 0;
 
             if (softness === 0) {
-                // Hard edges
-                const ix = Math.floor(fx);
-                const iy = Math.floor(fy);
-                return (ix + iy) % 2 === 0 ? 1 : 0;
-            } else {
-                // Soft edges using sine
-                const vx = (Math.sin(fx * Math.PI * 2) + 1) / 2;
-                const vy = (Math.sin(fy * Math.PI * 2) + 1) / 2;
-                const blend = (1 - softness);
-                const hard = ((Math.floor(fx) + Math.floor(fy)) % 2 === 0) ? 1 : 0;
-                return hard * blend + vx * vy * softness;
+                return isWhite ? 1 : 0;
             }
+
+            // Distance from center of square (0 at center, ~0.707 at corners)
+            const centerX = localX - 0.5;
+            const centerY = localY - 0.5;
+
+            // Use max of abs distances for square-shaped falloff (Chebyshev distance)
+            const distFromCenter = Math.max(Math.abs(centerX), Math.abs(centerY));
+
+            // distFromCenter is 0 at center, 0.5 at edges
+            // Map to a feather value: 1 at center, feathering toward edges
+            // The softness parameter controls how much of the square is feathered
+            // softness=0: no feathering, softness=1: feather from center to edge
+
+            const featherStart = 0.5 - softness * 0.5; // Where feathering starts (0 to 0.5)
+            let featherVal: number;
+
+            if (distFromCenter < featherStart) {
+                featherVal = 1; // Full intensity in center
+            } else {
+                // Smooth falloff from featherStart to 0.5
+                const t = (distFromCenter - featherStart) / (0.5 - featherStart);
+                featherVal = 1 - t; // Linear falloff to edge
+                featherVal = Math.max(0, Math.min(1, featherVal));
+            }
+
+            // For white squares: featherVal goes from 1 (center) to 0 (edge)
+            // For black squares: invert
+            return isWhite ? featherVal : (1 - featherVal);
         };
     }
 }
+

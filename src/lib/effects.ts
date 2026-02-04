@@ -357,4 +357,213 @@ export class Effects {
         const totalPaths = Object.values(pathCounters).reduce((a, b) => a + b, 0);
         return result;
     }
+
+    /**
+     * Glitch effect - displaces points toward weighted average of nearby points.
+     * Creates an interesting clustered/web-like distortion effect.
+     * 
+     * @param model The model to apply glitch to
+     * @param iterations Number of glitch passes
+     * @param factor Blend factor 0-1 (intensity of effect)
+     */
+    static glitch1(model: MakerJs.IModel, iterations: number = 1, factor: number = 0.5): MakerJs.IModel {
+        // Auto-resample arcs first so we work with line segments
+        if (modelHasArcs(model)) {
+            model = Transformer.resample(model, 0.5);
+        }
+
+        // Collect all points from the model
+        const collectPoints = (m: MakerJs.IModel, offset: [number, number] = [0, 0]): MakerJs.IPoint[] => {
+            const pts: MakerJs.IPoint[] = [];
+            const actualOffset: [number, number] = [
+                offset[0] + (m.origin?.[0] || 0),
+                offset[1] + (m.origin?.[1] || 0)
+            ];
+
+            if (m.paths) {
+                for (const key in m.paths) {
+                    const path = m.paths[key];
+                    if (path.type === 'line') {
+                        const line = path as MakerJs.IPathLine;
+                        pts.push([line.origin[0] + actualOffset[0], line.origin[1] + actualOffset[1]]);
+                        pts.push([line.end[0] + actualOffset[0], line.end[1] + actualOffset[1]]);
+                    }
+                }
+            }
+            if (m.models) {
+                for (const key in m.models) {
+                    pts.push(...collectPoints(m.models[key], actualOffset));
+                }
+            }
+            return pts;
+        };
+
+        // For each iteration, compute a spatial average map and apply displacement
+        for (let iter = 0; iter < iterations; iter++) {
+            const allPoints = collectPoints(model);
+
+            // Build a grid-based spatial index for fast neighbor lookups
+            const gridSize = 5; // mm per grid cell
+            const grid = new Map<string, MakerJs.IPoint[]>();
+
+            for (const pt of allPoints) {
+                const key = `${Math.floor(pt[0] / gridSize)},${Math.floor(pt[1] / gridSize)}`;
+                if (!grid.has(key)) grid.set(key, []);
+                grid.get(key)!.push(pt);
+            }
+
+            // Get neighbors for a point (within radius)
+            const getNeighbors = (x: number, y: number, radius: number): MakerJs.IPoint[] => {
+                const neighbors: MakerJs.IPoint[] = [];
+                const cellRadius = Math.ceil(radius / gridSize);
+                const cx = Math.floor(x / gridSize);
+                const cy = Math.floor(y / gridSize);
+
+                for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+                    for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+                        const key = `${cx + dx},${cy + dy}`;
+                        const pts = grid.get(key);
+                        if (pts) {
+                            for (const pt of pts) {
+                                const dist = Math.hypot(pt[0] - x, pt[1] - y);
+                                if (dist > 0.001 && dist <= radius) { // Exclude self
+                                    neighbors.push(pt);
+                                }
+                            }
+                        }
+                    }
+                }
+                return neighbors;
+            };
+
+            // Apply smoothing displacement
+            const searchRadius = 3; // mm - look for points within this radius
+
+            Transformer.displace(model, (x, y) => {
+                const neighbors = getNeighbors(x, y, searchRadius);
+
+                if (neighbors.length < 2) {
+                    return { x, y }; // Not enough neighbors to smooth
+                }
+
+                // Compute weighted average of neighbors (closer = more weight)
+                let sumX = 0, sumY = 0, sumW = 0;
+                for (const n of neighbors) {
+                    const dist = Math.hypot(n[0] - x, n[1] - y);
+                    const w = 1 / (dist + 0.1); // Inverse distance weight
+                    sumX += n[0] * w;
+                    sumY += n[1] * w;
+                    sumW += w;
+                }
+
+                const avgX = sumX / sumW;
+                const avgY = sumY / sumW;
+
+                // Move toward average
+                return {
+                    x: x + (avgX - x) * factor,
+                    y: y + (avgY - y) * factor
+                };
+            });
+        }
+
+        return model;
+    }
+
+    /**
+     * Glitch effect 2 - chaotic displacement based on proximity.
+     * Uses Transformer.displace with pre-computed displacement map.
+     */
+    static glitch2(model: MakerJs.IModel, iterations: number = 1, factor: number = 0.5): MakerJs.IModel {
+        // Ensure we're working with line segments
+        if (modelHasArcs(model)) {
+            model = Transformer.resample(model, 0.5);
+        }
+
+        // Resample to get more vertices
+        model = Transformer.resample(model, 1);
+
+        const tolerance = 1; // 1mm tolerance for matching points
+
+        for (let iter = 0; iter < iterations; iter++) {
+            // Collect all line endpoints and their neighbors
+            const pointData = new Map<string, { x: number; y: number; neighbors: { x: number; y: number }[] }>();
+
+            const getKey = (x: number, y: number) =>
+                `${Math.round(x / tolerance)},${Math.round(y / tolerance)}`;
+
+            // Walk model and collect endpoints
+            const collectEndpoints = (m: MakerJs.IModel, ox: number = 0, oy: number = 0) => {
+                const offX = ox + (m.origin?.[0] || 0);
+                const offY = oy + (m.origin?.[1] || 0);
+
+                if (m.paths) {
+                    for (const pathKey in m.paths) {
+                        const path = m.paths[pathKey];
+                        if (path.type === 'line') {
+                            const line = path as MakerJs.IPathLine;
+                            const x1 = line.origin[0] + offX;
+                            const y1 = line.origin[1] + offY;
+                            const x2 = line.end[0] + offX;
+                            const y2 = line.end[1] + offY;
+
+                            // Origin point's neighbor is end point
+                            const key1 = getKey(x1, y1);
+                            if (!pointData.has(key1)) {
+                                pointData.set(key1, { x: x1, y: y1, neighbors: [] });
+                            }
+                            pointData.get(key1)!.neighbors.push({ x: x2, y: y2 });
+
+                            // End point's neighbor is origin point
+                            const key2 = getKey(x2, y2);
+                            if (!pointData.has(key2)) {
+                                pointData.set(key2, { x: x2, y: y2, neighbors: [] });
+                            }
+                            pointData.get(key2)!.neighbors.push({ x: x1, y: y1 });
+                        }
+                    }
+                }
+                if (m.models) {
+                    for (const modelKey in m.models) {
+                        collectEndpoints(m.models[modelKey], offX, offY);
+                    }
+                }
+            };
+            collectEndpoints(model);
+
+            // Pre-compute displacements
+            const displacements = new Map<string, { dx: number; dy: number }>();
+
+            for (const [key, data] of pointData) {
+                if (data.neighbors.length < 2) {
+                    // Edge point - don't move
+                    displacements.set(key, { dx: 0, dy: 0 });
+                    continue;
+                }
+
+                // Average neighbor position
+                const avgX = data.neighbors.reduce((s, n) => s + n.x, 0) / data.neighbors.length;
+                const avgY = data.neighbors.reduce((s, n) => s + n.y, 0) / data.neighbors.length;
+
+                displacements.set(key, {
+                    dx: (avgX - data.x) * factor,
+                    dy: (avgY - data.y) * factor
+                });
+            }
+
+            // Apply using Transformer.displace
+            Transformer.displace(model, (x, y) => {
+                const key = getKey(x, y);
+                const d = displacements.get(key);
+                if (d) {
+                    return { x: x + d.dx, y: y + d.dy };
+                }
+                return { x, y };
+            });
+        }
+
+        return model;
+    }
 }
+
+

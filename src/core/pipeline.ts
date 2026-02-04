@@ -170,6 +170,18 @@ const MODIFIERS: Record<string, ModifierFn> = {
         Effects.simplify(model, params.tolerance || 0.5);
     },
 
+    'glitch1': (model, params) => {
+        const iterations = params.iterations || 1;
+        const factor = params.factor || 0.5;
+        return Effects.glitch1(model, iterations, factor);
+    },
+
+    'glitch2': (model, params) => {
+        const iterations = params.iterations || 3;
+        const factor = params.factor || 0.5;
+        return Effects.glitch2(model, iterations, factor);
+    },
+
     'rotate': (model, params, ctx, bounds) => {
         const origin = [bounds.width / 2, bounds.height / 2];
         MakerJs.model.rotate(model, params.rotation || 0, origin);
