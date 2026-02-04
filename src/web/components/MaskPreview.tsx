@@ -43,8 +43,19 @@ export default function MaskPreview({ mask, width = 150, height = 150 }: MaskPre
                 // If we passed width/height to bounds, we pass x,y directly
                 const val = maskFn(x, y);
 
+                // Apply contrast/brightness if present
+                // Use defaults: contrast 1, brightness 0
+                const contrast = mask.contrast !== undefined ? Number(mask.contrast) : 1;
+                const brightness = mask.brightness !== undefined ? Number(mask.brightness) : 0;
+
+                let v_adj = val;
+                if (contrast !== 1 || brightness !== 0) {
+                    v_adj = (val - 0.5) * contrast + 0.5 + brightness;
+                    v_adj = Math.max(0, Math.min(1, v_adj));
+                }
+
                 // Map 0-1 to grayscale
-                const v = Math.floor(val * 255);
+                const v = Math.floor(v_adj * 255);
 
                 const idx = (y * width + x) * 4;
                 data[idx] = v;     // R

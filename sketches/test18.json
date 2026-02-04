@@ -1,6 +1,6 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "test17",
+  "outputBaseName": "test",
   "canvas": {
     "height": 297,
     "width": 420,
@@ -48,7 +48,7 @@
           {
             "tool": "warp",
             "params": {
-              "type": "turbulence",
+              "type": "simplex",
               "strength": 16,
               "frequency": 0.0054,
               "octaves": 1,
@@ -58,8 +58,8 @@
               "offsetX": -22.4,
               "offsetY": 0,
               "seed": 1,
-              "maskContrast": 3.1,
-              "maskBrightness": 0.85
+              "maskContrast": 4.8,
+              "maskBrightness": -0.1
             }
           }
         ],
@@ -87,7 +87,7 @@
       {
         "tool": "warp",
         "params": {
-          "type": "turbulence",
+          "type": "simplex",
           "strength": 16,
           "frequency": 0.0054,
           "octaves": 1,
@@ -97,8 +97,8 @@
           "offsetX": -22.4,
           "offsetY": 0,
           "seed": 1,
-          "maskContrast": 3.1,
-          "maskBrightness": 0.85
+          "maskContrast": 4.8,
+          "maskBrightness": -0.1
         }
       }
     ],

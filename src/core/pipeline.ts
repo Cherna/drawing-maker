@@ -276,11 +276,20 @@ const MODIFIERS: Record<string, ModifierFn> = {
             const offsetX = params.offsetX || 0;
             const offsetY = params.offsetY || 0;
 
+            const pContrast = params.patternContrast !== undefined ? Number(params.patternContrast) : 1;
+            const pBrightness = params.patternBrightness !== undefined ? Number(params.patternBrightness) : 0;
+
             warpFn = (x, y) => {
-                const nx = patterns.get(noiseType as any, x + offsetX, y + offsetY, noiseParams, params.seed ?? 0);
+                let nx = patterns.get(noiseType as any, x + offsetX, y + offsetY, noiseParams, params.seed ?? 0);
                 // For Y displacement, sample from a different location to avoid correlated movement
                 // We also shift it by the offset (plus the hardcoded shift) so both axes move together
-                const ny = patterns.get(noiseType as any, x + offsetX + 1000, y + offsetY + 1000, noiseParams, params.seed ?? 0);
+                let ny = patterns.get(noiseType as any, x + offsetX + 1000, y + offsetY + 1000, noiseParams, params.seed ?? 0);
+
+                // Apply pattern adjustments
+                if (pContrast !== 1 || pBrightness !== 0) {
+                    nx = (nx - 0.5) * pContrast + 0.5 + pBrightness;
+                    ny = (ny - 0.5) * pContrast + 0.5 + pBrightness;
+                }
 
                 // Map 0..1 to -0.5..0.5 then scale
                 return {
@@ -395,7 +404,26 @@ const MODIFIERS: Record<string, ModifierFn> = {
             for (const step of params.steps) {
                 if (MODIFIERS[step.tool]) {
                     const seed = step.params?.seed ?? params.seed;
-                    const maskFn = step.mask ? Masks.create(step.mask, localBounds, seed) : undefined;
+                    let maskFn = step.mask ? Masks.create(step.mask, localBounds, seed) : undefined;
+
+                    // Apply mask adjustments (contrast/brightness)
+                    if (maskFn && step.params) {
+                        const contrast = step.params.maskContrast !== undefined ? step.params.maskContrast : 1;
+                        const brightness = step.params.maskBrightness !== undefined ? step.params.maskBrightness : 0;
+
+                        if (contrast !== 1 || brightness !== 0) {
+                            const originalFn = maskFn;
+                            maskFn = (x, y) => {
+                                let v = originalFn(x, y);
+                                // Apply contrast (pivot around 0.5)
+                                v = (v - 0.5) * contrast + 0.5;
+                                // Apply brightness
+                                v += brightness;
+                                // Clamp
+                                return Math.max(0, Math.min(1, v));
+                            };
+                        }
+                    }
 
                     // Apply modifier to duplicate (works on the isolated copy)
                     const result = await MODIFIERS[step.tool](duplicate, step.params || {}, ctx, localBounds, maskFn);
@@ -476,7 +504,27 @@ const MODIFIERS: Record<string, ModifierFn> = {
             for (const step of params.steps) {
                 if (MODIFIERS[step.tool]) {
                     const seed = step.params?.seed ?? params.seed;
-                    const maskFn = step.mask ? Masks.create(step.mask, localBounds, seed) : undefined;
+                    let maskFn = step.mask ? Masks.create(step.mask, localBounds, seed) : undefined;
+
+                    // Apply mask adjustments (contrast/brightness)
+                    if (maskFn && step.params) {
+                        const contrast = step.params.maskContrast !== undefined ? step.params.maskContrast : 1;
+                        const brightness = step.params.maskBrightness !== undefined ? step.params.maskBrightness : 0;
+
+                        if (contrast !== 1 || brightness !== 0) {
+                            const originalFn = maskFn;
+                            maskFn = (x, y) => {
+                                let v = originalFn(x, y);
+                                // Apply contrast (pivot around 0.5)
+                                v = (v - 0.5) * contrast + 0.5;
+                                // Apply brightness
+                                v += brightness;
+                                // Clamp
+                                return Math.max(0, Math.min(1, v));
+                            };
+                        }
+                    }
+
                     const result = await MODIFIERS[step.tool](layer, step.params || {}, ctx, localBounds, maskFn);
                     if (result) {
                         layer = result;
@@ -540,7 +588,27 @@ export class Pipeline {
                     throw new Error(`Pipeline Error: Cannot apply modifier '${step.tool}' without a base model.`);
                 }
 
-                const maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
+                let maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
+
+                // Apply mask adjustments (contrast/brightness)
+                if (maskFn && step.params) {
+                    const contrast = step.params.maskContrast !== undefined ? Number(step.params.maskContrast) : 1;
+                    const brightness = step.params.maskBrightness !== undefined ? Number(step.params.maskBrightness) : 0;
+
+                    if (contrast !== 1 || brightness !== 0) {
+                        const originalFn = maskFn;
+                        maskFn = (x, y) => {
+                            let v = originalFn(x, y);
+                            // Apply contrast (pivot around 0.5)
+                            v = (v - 0.5) * contrast + 0.5;
+                            // Apply brightness
+                            v += brightness;
+                            // Clamp
+                            return Math.max(0, Math.min(1, v));
+                        };
+                    }
+                }
+
                 const result = await MODIFIERS[step.tool](currentModel, stepParams, ctx, localBounds, maskFn);
 
                 if (result) {

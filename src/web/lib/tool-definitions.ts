@@ -142,21 +142,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'y', label: 'O. Set Y', type: 'number', min: -200, max: 200, step: 1, default: 0 },
     ],
   },
-  'noise': {
-    category: 'modifier',
-    label: 'Noise (Legacy)',
-    hasMask: true,
-    deprecated: true,
-    params: [
-      { key: 'scale', label: 'Scale', type: 'number', min: 0.0001, max: 0.5, step: 0.0001, default: 0.05 },
-      { key: 'magnitude', label: 'Magnitude', type: 'number', min: 0, max: 50, step: 0.1, default: 5 },
-      { key: 'axis', label: 'Axis', type: 'select', options: ['both', 'x', 'y'], default: 'both' },
-      { key: 'octaves', label: 'Octaves', type: 'number', min: 1, max: 8, step: 1, default: 1 },
-      { key: 'persistence', label: 'Persistence', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5 },
-      { key: 'lacunarity', label: 'Lacunarity', type: 'number', min: 1, max: 4, step: 0.1, default: 2 },
-      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 99999, step: 1 },
-    ],
-  },
+
   'trim': {
     category: 'modifier',
     label: 'Trim',
@@ -260,6 +246,11 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
       },
       { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 99999, step: 1 },
+      { key: 'maskContrast', label: 'Mask Contrast', type: 'number', min: 0, max: 5, step: 0.1, default: 1 },
+      { key: 'maskBrightness', label: 'Mask Brightness', type: 'number', min: -1, max: 1, step: 0.05, default: 0 },
+      // Pattern adjustments
+      { key: 'patternContrast', label: 'Pattern Contrast', type: 'number', min: 0, max: 5, step: 0.1, default: 1, showIf: (p) => ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type) },
+      { key: 'patternBrightness', label: 'Pattern Brightness', type: 'number', min: -1, max: 1, step: 0.05, default: 0, showIf: (p) => ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type) },
     ],
   },
   'duplicate': {

@@ -182,7 +182,9 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
                 lacunarity: step.params.lacunarity,
                 distortion: step.params.distortion,
                 seed: step.params.seed,
-              }
+              },
+              contrast: step.params.patternContrast,
+              brightness: step.params.patternBrightness,
             }}
           />
         </div>
