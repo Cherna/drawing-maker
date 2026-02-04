@@ -181,27 +181,48 @@ const MODIFIERS: Record<string, ModifierFn> = {
 
     'mirror': (model, params, ctx, bounds) => {
         const axis = params.axis || 'x';
-        // User feedback: "Mirror X" implies mirroring horizontally (across Y axis)
-        const normX = axis === 'x';
-        const normY = axis === 'y';
 
-        let cx, cy;
+        // Get model center
+        const extents = MakerJs.measure.modelExtents(model);
+        const cx = (extents.low[0] + extents.high[0]) / 2;
+        const cy = (extents.low[1] + extents.high[1]) / 2;
 
-        if (params.center) {
-            // Mirror relative to model center (Flip in place)
-            const extents = MakerJs.measure.modelExtents(model);
-            cx = (extents.low[0] + extents.high[0]) / 2;
-            cy = (extents.low[1] + extents.high[1]) / 2;
-        } else {
-            // Mirror relative to Canvas/Window Center
-            // This allows mirroring something from left to right side of page
-            cx = bounds.width / 2;
-            cy = bounds.height / 2;
+        // Deep clone to create independent copy
+        const mirrored = deepCloneModel(model);
+
+        // Manually flip coordinates around center
+        function flipPoint(point: MakerJs.IPoint): void {
+            if (axis === 'x') {
+                // Mirror horizontally: flip X coordinates around cx
+                point[0] = cx - (point[0] - cx);
+            } else {
+                // Mirror vertically: flip Y coordinates around cy  
+                point[1] = cy - (point[1] - cy);
+            }
         }
 
-        MakerJs.model.move(model, [-cx, -cy]);
-        MakerJs.model.mirror(model, normX, normY);
-        MakerJs.model.move(model, [cx, cy]);
+        // Recursively flip all paths in the model
+        function flipModel(m: MakerJs.IModel): void {
+            if (m.paths) {
+                for (const key in m.paths) {
+                    const path = m.paths[key];
+                    if (path.origin) flipPoint(path.origin);
+                    if ((path as any).end) flipPoint((path as any).end);
+                    // For arcs, also flip the center
+                    if (path.type === 'arc' && (path as any).origin) {
+                        flipPoint((path as any).origin);
+                    }
+                }
+            }
+            if (m.models) {
+                for (const key in m.models) {
+                    flipModel(m.models[key]);
+                }
+            }
+        }
+
+        flipModel(mirrored);
+        return mirrored;
     },
 
     'array': (model, params, ctx, bounds) => {

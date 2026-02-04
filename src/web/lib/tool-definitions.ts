@@ -115,7 +115,6 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     label: 'Mirror',
     params: [
       { key: 'axis', label: 'Axis', type: 'select', options: ['x', 'y'], default: 'x' },
-      { key: 'center', label: 'From Center', type: 'boolean', default: true },
     ],
   },
   'array': {
