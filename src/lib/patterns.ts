@@ -304,6 +304,39 @@ export class Patterns {
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
 
+        // Liang-Barsky line clipping algorithm
+        const clipLine = (x1: number, y1: number, x2: number, y2: number): [number, number, number, number] | null => {
+            let t0 = 0, t1 = 1;
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const p = [-dx, dx, -dy, dy];
+            const q = [x1 - 0, safeWidth - x1, y1 - 0, safeHeight - y1];
+
+            for (let i = 0; i < 4; i++) {
+                if (p[i] === 0) {
+                    if (q[i] < 0) return null; // Parallel and outside
+                } else {
+                    const t = q[i] / p[i];
+                    if (p[i] < 0) {
+                        if (t > t1) return null;
+                        if (t > t0) t0 = t;
+                    } else {
+                        if (t < t0) return null;
+                        if (t < t1) t1 = t;
+                    }
+                }
+            }
+
+            if (t0 > t1) return null;
+
+            return [
+                x1 + t0 * dx,
+                y1 + t0 * dy,
+                x1 + t1 * dx,
+                y1 + t1 * dy
+            ];
+        };
+
         // Generate parallel lines
         const generateLines = (ang: number, prefix: string) => {
             const c = Math.cos(ang);
@@ -323,14 +356,14 @@ export class Patterns {
                 const x2 = startX + c * diag;
                 const y2 = startY + s * diag;
 
-                // Clip to bounds (simple)
-                if ((x1 < 0 && x2 < 0) || (x1 > safeWidth && x2 > safeWidth)) continue;
-                if ((y1 < 0 && y2 < 0) || (y1 > safeHeight && y2 > safeHeight)) continue;
-
-                model.paths![`${prefix}_${i}`] = new MakerJs.paths.Line(
-                    [Math.max(0, Math.min(safeWidth, x1)), Math.max(0, Math.min(safeHeight, y1))],
-                    [Math.max(0, Math.min(safeWidth, x2)), Math.max(0, Math.min(safeHeight, y2))]
-                );
+                // Clip line to bounds using Liang-Barsky algorithm
+                const clipped = clipLine(x1, y1, x2, y2);
+                if (clipped) {
+                    model.paths![`${prefix}_${i}`] = new MakerJs.paths.Line(
+                        [clipped[0], clipped[1]],
+                        [clipped[2], clipped[3]]
+                    );
+                }
             }
         };
 
