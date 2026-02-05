@@ -1,6 +1,6 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "test",
+  "outputBaseName": "test24",
   "canvas": {
     "height": 297,
     "width": 420,
@@ -34,22 +34,16 @@
           {
             "tool": "honeycomb",
             "params": {
-              "radius": 1.5,
-              "gap": 0.7,
+              "radius": 3.5,
+              "gap": 0.8,
               "rotation": 0
-            }
-          },
-          {
-            "tool": "resample",
-            "params": {
-              "detail": 1
             }
           },
           {
             "tool": "warp",
             "params": {
-              "type": "simplex",
-              "strength": 25.5,
+              "type": "perlin",
+              "strength": 46.5,
               "frequency": 0.0193,
               "octaves": 1,
               "persistence": 0.5,
@@ -59,7 +53,7 @@
               "offsetY": 0,
               "maskContrast": 1,
               "maskBrightness": 0,
-              "patternContrast": 1,
+              "patternContrast": 0.8,
               "patternBrightness": 0,
               "seed": 4
             }
@@ -81,22 +75,16 @@
       {
         "tool": "honeycomb",
         "params": {
-          "radius": 1.5,
-          "gap": 0.7,
+          "radius": 3.5,
+          "gap": 0.8,
           "rotation": 0
-        }
-      },
-      {
-        "tool": "resample",
-        "params": {
-          "detail": 1
         }
       },
       {
         "tool": "warp",
         "params": {
-          "type": "simplex",
-          "strength": 25.5,
+          "type": "perlin",
+          "strength": 46.5,
           "frequency": 0.0193,
           "octaves": 1,
           "persistence": 0.5,
@@ -106,7 +94,7 @@
           "offsetY": 0,
           "maskContrast": 1,
           "maskBrightness": 0,
-          "patternContrast": 1,
+          "patternContrast": 0.8,
           "patternBrightness": 0,
           "seed": 4
         }
