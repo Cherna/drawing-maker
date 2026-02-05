@@ -1,6 +1,5 @@
-
 import MakerJs from 'makerjs';
-import { NoisePatterns } from './noise-patterns';
+import { NoisePatterns, seededRandom } from './noise-patterns';
 
 export class Patterns {
     /**
@@ -968,6 +967,282 @@ export class Patterns {
 
             // Stop if too small
             if (currentRadius < 1) break;
+        }
+
+        return model;
+    }
+
+    /**
+     * Truchet Tiles
+     * Grid-based patterns with random rotations
+     */
+    static Truchet(
+        width: number,
+        height: number,
+        options?: {
+            tileSize?: number;
+            style?: 'arcs' | 'lines' | 'checkered';
+            seed?: number;
+            radiusFactor?: number;
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { models: {} };
+        // Fallback for debugging: if width/height are suspiciously small or missing
+        const safeWidth = Number(width) > 0 ? Number(width) : 500;
+        const safeHeight = Number(height) > 0 ? Number(height) : 500;
+
+        console.log(`[Truchet] Input: ${width}x${height}, Safe: ${safeWidth}x${safeHeight}, Tile: ${options?.tileSize}`);
+        const tileSize = Math.max(1, options?.tileSize || 50);
+        const style = options?.style || 'arcs';
+        const seed = options?.seed || 0;
+        const radiusFactor = options?.radiusFactor || 0.5;
+
+        const cols = Math.ceil(safeWidth / tileSize);
+        const rows = Math.ceil(safeHeight / tileSize);
+
+        const rng = seededRandom(seed);
+
+        for (let i = 0; i < cols; i++) {
+            for (let j = 0; j < rows; j++) {
+                const x = i * tileSize;
+                const y = j * tileSize;
+
+                // Random orientation: 0, 1, 2, 3 (times 90 degrees)
+                const orientation = Math.floor(rng() * 4);
+
+                // Create tile content
+                const tileModel: MakerJs.IModel = { paths: {} };
+                // The radius for arcs. A factor of 0.5 means the arcs connect midpoints of the tile edges.
+                const half = tileSize * radiusFactor;
+
+                if (style === 'arcs') {
+                    // Standard Smith Truchet: Two arcs
+                    // The "standard" connects midpoints, which is radius = 0.5 * tileSize.
+                    // Varying this creates separate unconnected arcs or overlapping ones.
+                    tileModel.paths!.arc1 = new MakerJs.paths.Arc([0, 0], half, 0, 90);
+                    tileModel.paths!.arc2 = new MakerJs.paths.Arc([tileSize, tileSize], half, 180, 270);
+
+                } else if (style === 'lines') {
+                    // Diagonal lines connecting edge midpoints
+                    tileModel.paths!.line1 = new MakerJs.paths.Line([0, half], [half, 0]);
+                    tileModel.paths!.line2 = new MakerJs.paths.Line([tileSize, half], [half, tileSize]);
+
+                } else if (style === 'checkered') {
+                    // Simple diagonal for test
+                    tileModel.paths!.line1 = new MakerJs.paths.Line([0, 0], [tileSize, tileSize]);
+                }
+
+                // Rotate tile
+                if (orientation > 0) {
+                    MakerJs.model.rotate(tileModel, orientation * 90, [tileSize / 2, tileSize / 2]);
+                }
+
+                // Move to position
+                MakerJs.model.move(tileModel, [x, y]);
+
+                // CRITICAL: Bake the move into the geometry so it persists through modifiers that ignore 'origin'
+                MakerJs.model.originate(tileModel, [0, 0]);
+
+                model.models![`tile_${i}_${j}`] = tileModel;
+            }
+        }
+
+        return model;
+    }
+
+    /**
+     * Circle Packing
+     * Fills space with non-overlapping circles
+     */
+    static CirclePacking(
+        width: number,
+        height: number,
+        options?: {
+            minRadius?: number;
+            maxRadius?: number;
+            padding?: number;
+            count?: number; // Number of attempts
+            seed?: number;
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { paths: {} };
+        const safeWidth = Number(width) > 0 ? Number(width) : 500;
+        const safeHeight = Number(height) > 0 ? Number(height) : 500;
+
+        const minRadius = options?.minRadius ?? 2;
+        const maxRadius = options?.maxRadius ?? 50;
+        const padding = options?.padding ?? 2;
+        const attempts = options?.count || 1000;
+        const seed = options?.seed || 0;
+
+        const rng = seededRandom(seed);
+        const circles: { x: number, y: number, r: number }[] = [];
+
+        // Try to place circles
+        for (let i = 0; i < attempts; i++) {
+            const x = rng() * safeWidth;
+            const y = rng() * safeHeight;
+
+            // Initial safe radius (distance to walls)
+            let safeR = Math.min(
+                x,
+                y,
+                safeWidth - x,
+                safeHeight - y
+            );
+
+            // Subtract padding logic
+            safeR = safeR - padding;
+
+            if (safeR < minRadius) continue;
+
+            // Check against all existing circles
+            let intersect = false;
+            for (const c of circles) {
+                const dx = x - c.x;
+                const dy = y - c.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Distance to surface of existing circle
+                const distToSurface = dist - c.r - padding;
+
+                if (distToSurface < minRadius) {
+                    intersect = true;
+                    break;
+                }
+
+                // Shrink safeR if this neighbor is closer than current safeR
+                if (distToSurface < safeR) {
+                    safeR = distToSurface;
+                }
+            }
+
+            if (!intersect && safeR >= minRadius) {
+                // Place circle
+                const r = Math.min(maxRadius, safeR);
+                circles.push({ x, y, r });
+
+                model.paths![`c_${i}`] = new MakerJs.paths.Circle([x, y], r);
+            }
+        }
+
+        return model;
+    }
+
+    /**
+     * Voronoi Diagram
+     * Cellular noise patterns
+     */
+    static Voronoi(
+        width: number,
+        height: number,
+        options?: {
+            count?: number;
+            padding?: number;
+            seed?: number;
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { models: {} };
+        const safeWidth = Number(width) > 0 ? Number(width) : 500;
+        const safeHeight = Number(height) > 0 ? Number(height) : 500;
+
+        const count = options?.count || 50;
+        const padding = options?.padding || 0;
+        const seed = options?.seed || 0;
+
+        const rng = seededRandom(seed);
+        const points: { x: number, y: number }[] = [];
+
+        // Generate random points
+        for (let i = 0; i < count; i++) {
+            points.push({
+                x: rng() * safeWidth,
+                y: rng() * safeHeight
+            });
+        }
+
+        // Half-plane clipper helper
+        const clipByHalfPlane = (subject: [number, number][], normal: { x: number, y: number }, pOnPlane: { x: number, y: number }): [number, number][] => {
+            const output: [number, number][] = [];
+            if (subject.length === 0) return output;
+
+            const isInside = (p: [number, number]) => {
+                // Plane equation: (P - PlanePoint) . Normal <= 0
+                return ((p[0] - pOnPlane.x) * normal.x + (p[1] - pOnPlane.y) * normal.y) <= 0;
+            };
+
+            const intersect = (p1: [number, number], p2: [number, number]): [number, number] => {
+                const lineDir = { x: p2[0] - p1[0], y: p2[1] - p1[1] };
+                const dotNum = (pOnPlane.x - p1[0]) * normal.x + (pOnPlane.y - p1[1]) * normal.y;
+                const dotDenom = lineDir.x * normal.x + lineDir.y * normal.y;
+                if (Math.abs(dotDenom) < 1e-9) return p1; // Parallel
+                const t = dotNum / dotDenom;
+                return [p1[0] + t * lineDir.x, p1[1] + t * lineDir.y];
+            };
+
+            for (let i = 0; i < subject.length; i++) {
+                const curr = subject[i];
+                const prev = subject[(i + subject.length - 1) % subject.length];
+
+                const currIn = isInside(curr);
+                const prevIn = isInside(prev);
+
+                if (currIn) {
+                    if (!prevIn) {
+                        output.push(intersect(prev, curr));
+                    }
+                    output.push(curr);
+                } else if (prevIn) {
+                    output.push(intersect(prev, curr));
+                }
+            }
+            return output;
+        };
+
+        // Compute cells
+        for (let i = 0; i < points.length; i++) {
+            const site = points[i];
+
+            // Start with canvas rectangle
+            let poly: [number, number][] = [
+                [0, 0],
+                [safeWidth, 0],
+                [safeWidth, safeHeight],
+                [0, safeHeight]
+            ];
+
+            // Clip against all other points
+            for (let j = 0; j < points.length; j++) {
+                if (i === j) continue;
+
+                const neighbor = points[j];
+
+                // Normal points from Site to Neighbor
+                const dx = neighbor.x - site.x;
+                const dy = neighbor.y - site.y;
+                const len = Math.sqrt(dx * dx + dy * dy);
+
+                if (len < 1e-6) continue; // Coincident points
+
+                const normal = { x: dx / len, y: dy / len };
+
+                // Midpoint
+                let midX = site.x + dx * 0.5;
+                let midY = site.y + dy * 0.5;
+
+                // Apply padding: move midpoint CLOSER to site by padding/2
+                if (padding > 0) {
+                    midX -= normal.x * (padding / 2);
+                    midY -= normal.y * (padding / 2);
+                }
+
+                poly = clipByHalfPlane(poly, normal, { x: midX, y: midY });
+                if (poly.length < 3) break;
+            }
+
+            if (poly.length >= 3) {
+                model.models![`cell_${i}`] = new MakerJs.models.ConnectTheDots(true, poly);
+            }
         }
 
         return model;

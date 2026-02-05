@@ -175,6 +175,33 @@ const GENERATORS: Record<string, GeneratorFn> = {
             rotateStep: params.rotateStep,
             morphStep: params.morphStep
         });
+    },
+
+    'truchet': (params, ctx, bounds) => {
+        return Patterns.Truchet(bounds.width, bounds.height, {
+            tileSize: params.tileSize,
+            style: params.style === 2 ? 'lines' : 'arcs',
+            seed: params.seed,
+            radiusFactor: params.radiusFactor
+        });
+    },
+
+    'circle-packing': (params, ctx, bounds) => {
+        return Patterns.CirclePacking(bounds.width, bounds.height, {
+            minRadius: params.minRadius,
+            maxRadius: params.maxRadius,
+            padding: params.padding,
+            count: params.count,
+            seed: params.seed
+        });
+    },
+
+    'voronoi': (params, ctx, bounds) => {
+        return Patterns.Voronoi(bounds.width, bounds.height, {
+            count: params.count,
+            padding: params.padding,
+            seed: params.seed
+        });
     }
 };
 

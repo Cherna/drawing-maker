@@ -145,6 +145,36 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'morphStep', label: 'Morph Step', type: 'number', min: -1, max: 1, step: 0.1, default: 0 },
     ],
   },
+  'truchet': {
+    category: 'generator',
+    label: 'Truchet Tiles',
+    params: [
+      { key: 'tileSize', label: 'Tile Size', type: 'number', min: 1, max: 200, step: 0.1, default: 50 },
+      { key: 'style', label: 'Style (1=Arcs, 2=Lines)', type: 'number', min: 1, max: 2, step: 1, default: 1 },
+      { key: 'radiusFactor', label: 'Arc Radius', type: 'number', min: 0.1, max: 1.0, step: 0.01, default: 0.5 },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
+    ],
+  },
+  'circle-packing': {
+    category: 'generator',
+    label: 'Circle Packing',
+    params: [
+      { key: 'minRadius', label: 'Min Radius', type: 'number', min: 0.1, max: 200, step: 0.1, default: 2 },
+      { key: 'maxRadius', label: 'Max Radius', type: 'number', min: 1, max: 500, step: 0.1, default: 20 },
+      { key: 'padding', label: 'Padding', type: 'number', min: 0, max: 50, step: 0.1, default: 1 },
+      { key: 'count', label: 'Attempts', type: 'number', min: 100, max: 20000, step: 100, default: 2000 },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
+    ],
+  },
+  'voronoi': {
+    category: 'generator',
+    label: 'Voronoi',
+    params: [
+      { key: 'count', label: 'Cell Count', type: 'number', min: 5, max: 1000, step: 5, default: 50 },
+      { key: 'padding', label: 'Gap Size', type: 'number', min: 0, max: 20, step: 0.1, default: 2 },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
+    ],
+  },
   'hatching': {
     category: 'generator',
     label: 'Hatching',
