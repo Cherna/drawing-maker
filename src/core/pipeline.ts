@@ -130,7 +130,8 @@ const GENERATORS: Record<string, GeneratorFn> = {
     'honeycomb': (params, ctx, bounds) => {
         return Patterns.Honeycomb(bounds.width, bounds.height, {
             radius: params.radius,
-            gap: params.gap
+            gap: params.gap,
+            rotation: params.rotation
         });
     },
 

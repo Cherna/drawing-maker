@@ -5,7 +5,7 @@ import fs from 'fs';
 import { AppConfig, Layer } from '../types';
 import { PipelineSketch } from '../sketches/pipeline-sketch';
 import { generateGCode, generateGCodeForLayers } from '../core/gcode';
-import { modelToSVG, layersToSVG, modelToSVGWithColor } from '../core/svg-exporter';
+import { modelToSVG, layersToSVG, modelToSVGWithColor, getModelStats, modelToAnimatedSVG } from '../core/svg-exporter';
 import { Pipeline } from '../core/pipeline';
 
 const app = express();
@@ -64,6 +64,7 @@ function createPreviewConfig(config: AppConfig): AppConfig {
 }
 
 // API: Generate preview (lightweight)
+
 app.post('/api/preview', async (req, res) => {
     try {
         const config: AppConfig = req.body;
@@ -76,80 +77,53 @@ app.post('/api/preview', async (req, res) => {
             // New layer-aware rendering
             const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed);
 
-            // Container for global modifiers
+            // Build layer data for rendering
+            const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
             let finalModel: MakerJs.IModel = { models: {} };
-            for (const [id, model] of layerModels) {
-                finalModel.models![id] = model;
+
+            for (const layer of layers) {
+                if (!layer.visible) continue;
+
+                const model = layerModels.get(layer.id);
+                if (!model) continue;
+
+                layerData.set(layer.id, {
+                    model,
+                    color: layer.color || '#000000',
+                    opacity: layer.opacity,
+                    strokeWidth: layer.strokeWidth
+                });
+
+                finalModel.models![layer.id] = model;
             }
 
             // Apply global modifiers if present
             if (previewConfig.params.globalSteps && previewConfig.params.globalSteps.length > 0) {
                 finalModel = await Pipeline.executeOnModel(finalModel, previewConfig.params.globalSteps, previewConfig.canvas, previewConfig.params.seed);
-            }
 
-            // Build layer data map with colors for SVG export
-            const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
-
-            // If global modifiers were applied, finalModel might have changed structure.
-            // We try to find our layers back.
-            // If the structure is preserved (common case), finalModel.models keys will correspond to layer IDs.
-            if (finalModel.models) {
-                for (const layer of layers) {
-                    // We look for the layer ID in the modified model
-                    // OR we iterate what's in finalModel.models and try to match?
-                    // Let's assume ID preservation for now.
-                    // If a modifier duplicates (e.g. array), new IDs are generated. 
-                    // We might handle that later. For now, we just render what we find that matches known layers 
-                    // OR we render everything if structure changed?
-
-                    // Simple approach: Map known layers.
-                    if (finalModel.models[layer.id]) {
-                        layerData.set(layer.id, {
-                            model: finalModel.models[layer.id],
-                            color: layer.color || '#000000',
-                            opacity: layer.opacity,
-                            strokeWidth: layer.strokeWidth
-                        });
+                // Update layerData with modified models so they appear in the SVG
+                if (finalModel.models) {
+                    for (const layer of layers) {
+                        if (finalModel.models[layer.id]) {
+                            const data = layerData.get(layer.id);
+                            if (data) {
+                                data.model = finalModel.models[layer.id];
+                            }
+                        }
                     }
                 }
-
-                // If we possess models that are NOT in layers (e.g. from Array/Duplicate modifier on global level),
-                // we should render them too with a default color?
-                // For global modifiers, usually we want to treat the result as "the drawing".
-                // If global modifiers are used, maybe we should just render everything in `finalModel`.
-
-                // Let's iterate finalModel.models
-                for (const key in finalModel.models) {
-                    if (!layerData.has(key)) {
-                        // It's a new sub-model (maybe from array/duplicate)
-                        // Inherit color from parent or default?
-                        // Hard to know which layer it came from if renamed.
-                        // Default to black.
-                        layerData.set(key, {
-                            model: finalModel.models[key],
-                            color: '#000000',
-                            opacity: 1,
-                            strokeWidth: 1
-                        });
-                    }
-                }
-            } else {
-                // The model might have been flattened to paths?
-                // If so, treat as "base" layer.
-                layerData.set('combined', {
-                    model: finalModel,
-                    color: '#000000'
-                });
             }
 
             const svg = layersToSVG(layerData, previewConfig.canvas);
-            res.json({ svg });
+            const stats = getModelStats(finalModel);
+            res.json({ svg, stats });
         } else {
             // Backward compatibility: use old pipeline for non-layered configs
             const sketch = new PipelineSketch();
             const model = await sketch.generate(previewConfig.canvas, previewConfig.params);
             const svg = modelToSVG(model, previewConfig.canvas);
-            res.json({ svg });
+            const stats = getModelStats(model);
+            res.json({ svg, stats });
         }
     } catch (error: any) {
         console.error('Preview error:', error);
@@ -372,6 +346,36 @@ app.delete('/api/sketches/:filename', async (req, res) => {
         res.json({ success: true, filename });
     } catch (error: any) {
         console.error('Delete error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Export animated SVG
+app.post('/api/export-animated', async (req, res) => {
+    try {
+        const config: AppConfig = req.body;
+        const layers = config.params?.layers as Layer[] | undefined;
+
+        let model: MakerJs.IModel;
+
+        if (layers && layers.length > 0) {
+            const layerModels = await Pipeline.executeLayered(layers, config.canvas, config.params.seed);
+            model = { models: {} };
+            for (const [id, layerModel] of layerModels) {
+                model.models![id] = layerModel;
+            }
+        } else {
+            const sketch = new PipelineSketch();
+            model = await sketch.generate(config.canvas, config.params);
+        }
+
+        const animatedSvg = modelToAnimatedSVG(model, config.canvas, {
+            duration: 10,
+            stagger: 0.05
+        });
+
+        res.json({ svg: animatedSvg });
+    } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });

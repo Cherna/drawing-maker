@@ -97,6 +97,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     params: [
       { key: 'radius', label: 'Radius', type: 'number', min: 1, max: 100, step: 1, default: 10 },
       { key: 'gap', label: 'Gap', type: 'number', min: 0, max: 50, step: 0.5, default: 0 },
+      { key: 'rotation', label: 'Rotation', type: 'number', min: 0, max: 360, step: 1, default: 0 },
     ],
   },
   'phyllotaxis': {

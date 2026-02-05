@@ -476,7 +476,7 @@ export class Patterns {
         options?: {
             radius?: number;
             gap?: number;
-            // TODO: Rotation?
+            rotation?: number; // Rotation in degrees
         }
     ): MakerJs.IModel {
         const model: MakerJs.IModel = { models: {} };
@@ -484,6 +484,7 @@ export class Patterns {
         const safeHeight = Number(height);
         const r = options?.radius || 10;
         const gap = options?.gap || 0;
+        const rotation = (options?.rotation || 0) * Math.PI / 180; // Convert to radians
 
         const effectiveR = r + gap;
         const w = Math.sqrt(3) * effectiveR;
@@ -504,7 +505,7 @@ export class Patterns {
 
                 const points: MakerJs.IPoint[] = [];
                 for (let k = 0; k < 6; k++) {
-                    const ang = (30 + 60 * k) * Math.PI / 180;
+                    const ang = (30 + 60 * k) * Math.PI / 180 + rotation; // Apply rotation
                     points.push([
                         cx + r * Math.cos(ang),
                         cy + r * Math.sin(ang)

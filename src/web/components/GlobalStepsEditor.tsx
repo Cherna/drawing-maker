@@ -6,7 +6,7 @@ import GlobalStepItem from './GlobalStepItem';
 import { MODIFIERS, TOOL_DEFINITIONS } from '../lib/tool-definitions';
 
 export default function GlobalStepsEditor() {
-    const steps = useConfigStore((state) => state.config.params?.globalSteps || []);
+    const steps: PipelineStep[] = useConfigStore((state) => state.config.params?.globalSteps || []);
     const addGlobalStep = useConfigStore((state) => state.addGlobalStep);
 
     const handleAddTool = (toolName: string) => {

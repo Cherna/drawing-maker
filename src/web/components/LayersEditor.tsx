@@ -437,6 +437,7 @@ export default function LayersEditor() {
                     title="Stroke Width (mm)"
                   />
 
+
                   {/* Layer name */}
                   <span className={`flex-1 text-sm truncate ${!isVisible ? 'text-muted-foreground' : ''}`}>
                     {layer.name}
