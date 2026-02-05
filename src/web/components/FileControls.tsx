@@ -241,6 +241,47 @@ export default function FileControls() {
                     <RefreshCw className="w-4 h-4" />
                 </Button>
             </div>
+
+            {/* Export Animated SVG */}
+            <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={async () => {
+                    setIsLoading(true);
+                    try {
+                        const res = await fetch('http://localhost:3000/api/export-animated', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(config),
+                        });
+                        if (!res.ok) throw new Error('Export failed');
+                        const data = await res.json();
+
+                        // Download animated SVG
+                        const blob = new Blob([data.svg], { type: 'image/svg+xml' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `${config.outputBaseName}_animated.svg`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                    } catch (e) {
+                        console.error('Failed to export animated SVG:', e);
+                        alert('Failed to export animated SVG');
+                    } finally {
+                        setIsLoading(false);
+                    }
+                }}
+                disabled={isLoading}
+                title="Export as animated SVG (stroke-drawing animation)"
+            >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    <circle cx="12" cy="12" r="2" fill="currentColor" opacity="0.3" />
+                </svg>
+                Export Animated SVG
+            </Button>
         </div>
     );
 }

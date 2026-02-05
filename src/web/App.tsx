@@ -34,7 +34,7 @@ function App() {
     <div className="flex h-screen flex-col bg-background text-foreground">
       <Header />
       <div className="flex flex-1 overflow-hidden">
-        <ResizableSidebar />
+        <ResizableSidebar stats={preview?.stats} />
         <Preview svg={preview?.svg} isLoading={isFetching} error={error} />
       </div>
     </div>

@@ -28,11 +28,71 @@ export class NoisePatterns {
     private noise2D: (x: number, y: number) => number;
     private noise3D: (x: number, y: number, z: number) => number;
     private rng: () => number;
+    private perm: number[] = [];
 
     constructor(seed: number = Date.now()) {
         this.rng = seededRandom(seed);
         this.noise2D = createNoise2D(this.rng);
         this.noise3D = createNoise3D(this.rng);
+
+        // Initialize Perlin permutation table
+        const p: number[] = [];
+        for (let i = 0; i < 256; i++) p[i] = i;
+
+        // Shuffle using seeded rng
+        for (let i = 255; i > 0; i--) {
+            const r = Math.floor(this.rng() * (i + 1));
+            [p[i], p[r]] = [p[r], p[i]];
+        }
+
+        // Duplicate
+        this.perm = new Array(512);
+        for (let i = 0; i < 512; i++) {
+            this.perm[i] = p[i & 255];
+        }
+    }
+
+    // Classic Perlin Noise
+    perlin2D(x: number, y: number): number {
+        // Find unit grid cell containing point
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+
+        // Get relative xy coordinates of point within that cell
+        x -= Math.floor(x);
+        y -= Math.floor(y);
+
+        // Compute fade curves for each of x, y
+        const u = this.fade(x);
+        const v = this.fade(y);
+
+        // Hash coordinates of the 4 square corners
+        const A = this.perm[X] + Y;
+        const B = this.perm[X + 1] + Y;
+
+        // Add blended results from 4 corners of square
+        const res = this.lerp(v,
+            this.lerp(u, this.grad(this.perm[A], x, y), this.grad(this.perm[B], x - 1, y)),
+            this.lerp(u, this.grad(this.perm[A + 1], x, y - 1), this.grad(this.perm[B + 1], x - 1, y - 1))
+        );
+
+        return res;
+    }
+
+    private fade(t: number): number {
+        return t * t * t * (t * (t * 6 - 15) + 10);
+    }
+
+    private lerp(t: number, a: number, b: number): number {
+        return a + t * (b - a);
+    }
+
+    private grad(hash: number, x: number, y: number): number {
+        // Convert lo 4 bits of hash code into 12 gradient directions
+        const h = hash & 15;
+        const u = h < 8 ? x : y;
+        const v = h < 4 ? y : (h === 12 || h === 14 ? x : 0);
+        return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
     }
 
     // Basic Simplex Noise (-1 to 1)
@@ -140,8 +200,10 @@ export class NoisePatterns {
     get(type: NoiseType, x: number, y: number, params: NoiseParams, seed?: number): number {
         switch (type) {
             case 'simplex':
-            case 'perlin': // Simplex is often used as better Perlin
                 return (this.simplex(x, y, params.scale) + 1) / 2; // Normalize -1..1 to 0..1
+            case 'perlin':
+                // Perlin is typically -1..1 (approx), normalize to 0..1
+                return (this.perlin2D(x * params.scale, y * params.scale) + 1) / 2;
             case 'turbulence':
                 return this.turbulence(x, y, params);
             case 'marble':

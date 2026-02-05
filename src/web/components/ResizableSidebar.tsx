@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './Sidebar';
 import { cn } from '../lib/utils';
+import { GripVertical } from 'lucide-react';
 
-export default function ResizableSidebar() {
+interface ResizableSidebarProps {
+  stats?: { pathCount: number; totalLength: number } | null;
+}
+
+export default function ResizableSidebar({ stats }: ResizableSidebarProps) {
   const [width, setWidth] = useState(600); // Increased default width for better fit
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -48,7 +53,7 @@ export default function ResizableSidebar() {
       style={{ width: `${width}px` }}
     >
       <div className="flex-1 overflow-hidden">
-        <Sidebar />
+        <Sidebar stats={stats} />
       </div>
 
       {/* Resize Handle */}

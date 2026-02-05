@@ -111,6 +111,97 @@ const GENERATORS: Record<string, GeneratorFn> = {
             angle: params.angle,
             bidirectional: params.bidirectional
         });
+    },
+
+    'gilbert': (params, ctx, bounds) => {
+        return Patterns.Gilbert(bounds.width, bounds.height, {
+            scale: params.scale || 10
+        });
+    },
+
+    'gyroid': (params, ctx, bounds) => {
+        return Patterns.Gyroid(bounds.width, bounds.height, {
+            scale: params.scale,
+            z: params.z,
+            threshold: params.threshold
+        });
+    },
+
+    'honeycomb': (params, ctx, bounds) => {
+        return Patterns.Honeycomb(bounds.width, bounds.height, {
+            radius: params.radius,
+            gap: params.gap,
+            rotation: params.rotation
+        });
+    },
+
+    'phyllotaxis': (params, ctx, bounds) => {
+        return Patterns.Phyllotaxis(bounds.width, bounds.height, {
+            count: params.count,
+            spacing: params.spacing,
+            flower: params.flower,
+            size: params.size
+        });
+    },
+
+    'isometric': (params, ctx, bounds) => {
+        return Patterns.IsometricGrid(bounds.width, bounds.height, {
+            size: params.size
+        });
+    },
+
+    'flow-field': (params, ctx, bounds) => {
+        return Patterns.FlowField(bounds.width, bounds.height, {
+            count: params.count,
+            stepSize: params.stepSize,
+            steps: params.steps,
+            noiseScale: params.noiseScale,
+            distortion: params.distortion,
+            seed: params.seed
+        });
+    },
+
+    'superformula': (params, ctx, bounds) => {
+        return Patterns.Superformula(bounds.width, bounds.height, {
+            radius: params.radius,
+            m: params.m,
+            n1: params.n1,
+            n2: params.n2,
+            n3: params.n3,
+            a: params.a,
+            b: params.b,
+            count: params.count,
+            scaleStep: params.scaleStep,
+            rotateStep: params.rotateStep,
+            morphStep: params.morphStep
+        });
+    },
+
+    'truchet': (params, ctx, bounds) => {
+        return Patterns.Truchet(bounds.width, bounds.height, {
+            tileSize: params.tileSize,
+            style: params.style === 2 ? 'lines' : 'arcs',
+            seed: params.seed,
+            radiusFactor: params.radiusFactor
+        });
+    },
+
+    'circle-packing': (params, ctx, bounds) => {
+        return Patterns.CirclePacking(bounds.width, bounds.height, {
+            minRadius: params.minRadius,
+            maxRadius: params.maxRadius,
+            padding: params.padding,
+            count: params.count,
+            seed: params.seed
+        });
+    },
+
+    'voronoi': (params, ctx, bounds) => {
+        return Patterns.Voronoi(bounds.width, bounds.height, {
+            count: params.count,
+            padding: params.padding,
+            seed: params.seed
+        });
     }
 };
 

@@ -48,22 +48,27 @@ function processPathToLines(
 }
 
 /**
- * Custom SVG exporter that preserves canvas coordinates.
- * MakerJs.exporter.toSVG auto-shifts coordinates to (0,0) which breaks our centering.
+ * Shared utility to walk a model tree and collect SVG path strings.
+ * @param model The model to walk
+ * @param canvasHeight Canvas height for Y-axis flipping
+ * @param pathProcessor Callback to process each path (receives path, offsetX, offsetY, canvasHeight, lines array)
+ * @returns Array of SVG path strings
  */
-export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string {
+function walkAllPaths(
+    model: MakerJs.IModel,
+    canvasHeight: number,
+    pathProcessor: (path: MakerJs.IPath, offsetX: number, offsetY: number, canvasHeight: number, lines: string[]) => void
+): string[] {
     const lines: string[] = [];
-    const canvasHeight = canvas.height;
 
     function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
-        // Account for model's origin if it has one
         const modelOrigin = m.origin || [0, 0];
         const newOffsetX = offsetX + modelOrigin[0];
         const newOffsetY = offsetY + modelOrigin[1];
 
         if (m.paths) {
             for (const p of Object.values(m.paths)) {
-                processPathToLines(p, newOffsetX, newOffsetY, canvasHeight, lines);
+                pathProcessor(p, newOffsetX, newOffsetY, canvasHeight, lines);
             }
         }
         if (m.models) {
@@ -74,6 +79,15 @@ export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string 
     }
 
     walkModel(model);
+    return lines;
+}
+
+/**
+ * Custom SVG exporter that preserves canvas coordinates.
+ * MakerJs.exporter.toSVG auto-shifts coordinates to (0,0) which breaks our centering.
+ */
+export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string {
+    const lines = walkAllPaths(model, canvas.height, processPathToLines);
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
      width="${canvas.width}mm" 
@@ -99,28 +113,7 @@ export function modelToSVGWithColor(
     opacity: number = 1.0,
     strokeWidth: number = 0.25
 ): string {
-    const lines: string[] = [];
-    const canvasHeight = canvas.height;
-
-    function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
-        const modelOrigin = m.origin || [0, 0];
-        const newOffsetX = offsetX + modelOrigin[0];
-        const newOffsetY = offsetY + modelOrigin[1];
-
-        if (m.paths) {
-            for (const p of Object.values(m.paths)) {
-                processPathToLines(p, newOffsetX, newOffsetY, canvasHeight, lines);
-            }
-        }
-        if (m.models) {
-            for (const child of Object.values(m.models)) {
-                walkModel(child, newOffsetX, newOffsetY);
-            }
-        }
-    }
-
-    walkModel(model);
-
+    const lines = walkAllPaths(model, canvas.height, processPathToLines);
     const opacityAttr = opacity < 1.0 ? ` stroke-opacity="${opacity.toFixed(2)}"` : '';
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
@@ -153,28 +146,8 @@ export function layersToSVG(
 
     // Process each layer
     for (const [layerId, data] of layerData.entries()) {
-        const lines: string[] = [];
         const { model, color, opacity = 1.0, strokeWidth = 0.25 } = data;
-
-        function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
-            const modelOrigin = m.origin || [0, 0];
-            const newOffsetX = offsetX + modelOrigin[0];
-            const newOffsetY = offsetY + modelOrigin[1];
-
-            if (m.paths) {
-                for (const p of Object.values(m.paths)) {
-                    processPathToLines(p, newOffsetX, newOffsetY, canvasHeight, lines);
-                }
-            }
-            if (m.models) {
-                for (const child of Object.values(m.models)) {
-                    walkModel(child, newOffsetX, newOffsetY);
-                }
-            }
-        }
-
-        walkModel(model);
-
+        const lines = walkAllPaths(model, canvasHeight, processPathToLines);
         const opacityAttr = opacity < 1.0 ? ` stroke-opacity="${opacity.toFixed(2)}"` : '';
 
         // Create a group for this layer
@@ -193,3 +166,128 @@ ${layerGroups.join('\n')}
 
     return svg;
 }
+
+/**
+ * Calculate statistics for a model
+ * @param model The model to analyze
+ * @returns Object containing pathCount and totalLength (in mm)
+ */
+export function getModelStats(model: MakerJs.IModel): { pathCount: number, totalLength: number } {
+    let pathCount = 0;
+    let totalLength = 0;
+
+    function walkModel(m: MakerJs.IModel) {
+        if (m.paths) {
+            for (const path of Object.values(m.paths)) {
+                pathCount++;
+                totalLength += MakerJs.measure.pathLength(path);
+            }
+        }
+        if (m.models) {
+            for (const child of Object.values(m.models)) {
+                walkModel(child);
+            }
+        }
+    }
+
+    walkModel(model);
+    return { pathCount, totalLength };
+}
+
+/**
+ * Export model as animated SVG with stroke-dasharray animation
+ * Paths are drawn sequentially for pen plotter visualization
+ * @param model The model to export
+ * @param canvas Canvas configuration
+ * @param options Animation options
+ * @returns Animated SVG string
+ */
+export function modelToAnimatedSVG(
+    model: MakerJs.IModel,
+    canvas: CanvasConfig,
+    options?: {
+        duration?: number;    // Total animation duration in seconds (default: 10)
+        stagger?: number;     // Delay between path animations in seconds (default: 0.05)
+    }
+): string {
+    const duration = options?.duration || 10;
+    const stagger = options?.stagger || 0.05;
+    const canvasHeight = canvas.height;
+
+    interface AnimatedPath {
+        svgString: string;
+        length: number;
+    }
+
+    const animatedPaths: AnimatedPath[] = [];
+
+    function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0) {
+        const modelOrigin = m.origin || [0, 0];
+        const newOffsetX = offsetX + modelOrigin[0];
+        const newOffsetY = offsetY + modelOrigin[1];
+
+        if (m.paths) {
+            for (const path of Object.values(m.paths)) {
+                const length = MakerJs.measure.pathLength(path);
+                const lines: string[] = [];
+                processPathToLines(path, newOffsetX, newOffsetY, canvasHeight, lines);
+                if (lines.length > 0) {
+                    animatedPaths.push({
+                        svgString: lines[0],
+                        length
+                    });
+                }
+            }
+        }
+        if (m.models) {
+            for (const child of Object.values(m.models)) {
+                walkModel(child, newOffsetX, newOffsetY);
+            }
+        }
+    }
+
+    walkModel(model);
+
+    // Generate SVG with animations
+    const pathElements = animatedPaths.map((p, index) => {
+        const delay = index * stagger;
+        const animDuration = duration / animatedPaths.length;
+
+        // Replace line/circle/path tags with animated versions
+        let element = p.svgString;
+
+        // Add stroke-dasharray and animation
+        const animationId = `anim_${index}`;
+        element = element.replace(/\/>$/, `
+            style="stroke-dasharray: ${p.length}; stroke-dashoffset: ${p.length};"
+        >
+            <animate
+                attributeName="stroke-dashoffset"
+                from="${p.length}"
+                to="0"
+                dur="${animDuration}s"
+                begin="${delay}s"
+                fill="freeze"
+            />
+        </${element.match(/<(\w+)/)?.[1]}>`);
+
+        return element;
+    }).join('\n    ');
+
+    const totalDuration = (animatedPaths.length * stagger) + (duration / animatedPaths.length);
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
+     width="${canvas.width}mm" 
+     height="${canvas.height}mm" 
+     viewBox="0 0 ${canvas.width} ${canvas.height}"
+     style="background-color: #FAF8F3;">
+  <g stroke="#000" stroke-width="0.5" fill="none" stroke-linecap="round">
+    ${pathElements}
+  </g>
+  <!-- Animation repeats indefinitely -->
+  <animate attributeName="opacity" from="1" to="1" dur="${totalDuration}s" repeatCount="indefinite" />
+</svg>`;
+
+    return svg;
+}
+

@@ -75,6 +75,106 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'frequency', label: 'Frequency', type: 'number', min: 0.1, max: 10, step: 0.1, default: 3 },
     ],
   },
+  'gilbert': {
+    category: 'generator',
+    label: 'Hilbert Curve',
+    params: [
+      { key: 'scale', label: 'Scale', type: 'number', min: 1, max: 100, step: 0.1, default: 10 },
+    ],
+  },
+  'gyroid': {
+    category: 'generator',
+    label: 'Gyroid',
+    params: [
+      { key: 'scale', label: 'Scale', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1 },
+      { key: 'z', label: 'Z Slice', type: 'number', min: 0, max: 100, step: 0.1, default: 0 },
+      { key: 'threshold', label: 'Threshold', type: 'number', min: 0, max: 0.5, step: 0.01, default: 0.1 },
+    ],
+  },
+  'honeycomb': {
+    category: 'generator',
+    label: 'Honeycomb',
+    params: [
+      { key: 'radius', label: 'Radius', type: 'number', min: 1, max: 100, step: 0.1, default: 10 },
+      { key: 'gap', label: 'Gap', type: 'number', min: 0, max: 50, step: 0.1, default: 0 },
+      { key: 'rotation', label: 'Rotation', type: 'number', min: 0, max: 360, step: 1, default: 0 },
+    ],
+  },
+  'phyllotaxis': {
+    category: 'generator',
+    label: 'Phyllotaxis',
+    params: [
+      { key: 'count', label: 'Count', type: 'number', min: 10, max: 2000, step: 10, default: 500 },
+      { key: 'spacing', label: 'Spacing', type: 'number', min: 1, max: 20, step: 0.1, default: 5 },
+      { key: 'flower', label: 'Angle', type: 'number', min: 0, max: 360, step: 0.1, default: 137.5 },
+      { key: 'size', label: 'Point Size', type: 'number', min: 0, max: 20, step: 0.1, default: 0 },
+    ],
+  },
+  'isometric': {
+    category: 'generator',
+    label: 'Isometric Grid',
+    params: [
+      { key: 'size', label: 'Size', type: 'number', min: 5, max: 100, step: 1, default: 20 },
+    ],
+  },
+  'flow-field': {
+    category: 'generator',
+    label: 'Flow Field',
+    params: [
+      { key: 'count', label: 'Line Count', type: 'number', min: 10, max: 10000, step: 10, default: 500 },
+      { key: 'steps', label: 'Line Length', type: 'number', min: 10, max: 10000, step: 10, default: 500 },
+      { key: 'stepSize', label: 'Step Size', type: 'number', min: 0.1, max: 20, step: 0.1, default: 1 },
+      { key: 'noiseScale', label: 'Noise Scale', type: 'number', min: 0.0001, max: 0.1, step: 0.0001, default: 0.002 },
+      { key: 'distortion', label: 'Distortion', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1 },
+    ],
+  },
+  'superformula': {
+    category: 'generator',
+    label: 'Superformula',
+    params: [
+      { key: 'radius', label: 'Radius', type: 'number', min: 1, max: 200, step: 0.1, default: 50 },
+      { key: 'm', label: 'Symmetry (m)', type: 'number', min: 0, max: 20, step: 0.5, default: 6 },
+      { key: 'n1', label: 'Shape (n1)', type: 'number', min: 0.1, max: 50, step: 0.1, default: 1 },
+      { key: 'n2', label: 'Shape (n2)', type: 'number', min: 0.1, max: 50, step: 0.1, default: 1 },
+      { key: 'n3', label: 'Shape (n3)', type: 'number', min: 0.1, max: 50, step: 0.1, default: 1 },
+      { key: 'a', label: 'Semi-axis (a)', type: 'number', min: 0.1, max: 10, step: 0.1, default: 1 },
+      { key: 'b', label: 'Semi-axis (b)', type: 'number', min: 0.1, max: 10, step: 0.1, default: 1 },
+      { key: 'count', label: 'Count', type: 'number', min: 1, max: 50, step: 1, default: 1 },
+      { key: 'scaleStep', label: 'Scale Factor', type: 'number', min: 0.1, max: 1.5, step: 0.05, default: 0.9 },
+      { key: 'rotateStep', label: 'Rotation Step', type: 'number', min: -180, max: 180, step: 5, default: 0 },
+      { key: 'morphStep', label: 'Morph Step', type: 'number', min: -1, max: 1, step: 0.1, default: 0 },
+    ],
+  },
+  'truchet': {
+    category: 'generator',
+    label: 'Truchet Tiles',
+    params: [
+      { key: 'tileSize', label: 'Tile Size', type: 'number', min: 1, max: 200, step: 0.1, default: 50 },
+      { key: 'style', label: 'Style (1=Arcs, 2=Lines)', type: 'number', min: 1, max: 2, step: 1, default: 1 },
+      { key: 'radiusFactor', label: 'Arc Radius', type: 'number', min: 0.1, max: 1.0, step: 0.01, default: 0.5 },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
+    ],
+  },
+  'circle-packing': {
+    category: 'generator',
+    label: 'Circle Packing',
+    params: [
+      { key: 'minRadius', label: 'Min Radius', type: 'number', min: 0.1, max: 200, step: 0.1, default: 2 },
+      { key: 'maxRadius', label: 'Max Radius', type: 'number', min: 1, max: 500, step: 0.1, default: 20 },
+      { key: 'padding', label: 'Padding', type: 'number', min: 0, max: 50, step: 0.1, default: 1 },
+      { key: 'count', label: 'Attempts', type: 'number', min: 100, max: 20000, step: 100, default: 2000 },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
+    ],
+  },
+  'voronoi': {
+    category: 'generator',
+    label: 'Voronoi',
+    params: [
+      { key: 'count', label: 'Cell Count', type: 'number', min: 5, max: 1000, step: 5, default: 50 },
+      { key: 'padding', label: 'Gap Size', type: 'number', min: 0, max: 20, step: 0.1, default: 2 },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
+    ],
+  },
   'hatching': {
     category: 'generator',
     label: 'Hatching',
