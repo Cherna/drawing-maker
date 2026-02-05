@@ -148,6 +148,33 @@ const GENERATORS: Record<string, GeneratorFn> = {
         return Patterns.IsometricGrid(bounds.width, bounds.height, {
             size: params.size
         });
+    },
+
+    'flow-field': (params, ctx, bounds) => {
+        return Patterns.FlowField(bounds.width, bounds.height, {
+            count: params.count,
+            stepSize: params.stepSize,
+            steps: params.steps,
+            noiseScale: params.noiseScale,
+            distortion: params.distortion,
+            seed: params.seed
+        });
+    },
+
+    'superformula': (params, ctx, bounds) => {
+        return Patterns.Superformula(bounds.width, bounds.height, {
+            radius: params.radius,
+            m: params.m,
+            n1: params.n1,
+            n2: params.n2,
+            n3: params.n3,
+            a: params.a,
+            b: params.b,
+            count: params.count,
+            scaleStep: params.scaleStep,
+            rotateStep: params.rotateStep,
+            morphStep: params.morphStep
+        });
     }
 };
 

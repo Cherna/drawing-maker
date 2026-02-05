@@ -1,5 +1,6 @@
 
 import MakerJs from 'makerjs';
+import { NoisePatterns } from './noise-patterns';
 
 export class Patterns {
     /**
@@ -775,6 +776,198 @@ export class Patterns {
         generateLines(angle, 'h');
         if (bidirectional) {
             generateLines(-angle, 'hb');
+        }
+
+        return model;
+    }
+
+    /**
+     * Flow Field
+     * Traces paths through a noise field
+     */
+    static FlowField(
+        width: number,
+        height: number,
+        options?: {
+            count?: number;
+            stepSize?: number;
+            steps?: number;
+            noiseScale?: number;
+            distortion?: number;
+            seed?: number;
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { paths: {} };
+        const safeWidth = Number(width);
+        const safeHeight = Number(height);
+
+        if (safeWidth <= 0 || safeHeight <= 0) return model;
+
+        const count = options?.count || 500;
+        const stepSize = options?.stepSize || 1;
+        const maxSteps = options?.steps || 100;
+        const noiseScale = options?.noiseScale || 0.01;
+        const distortion = options?.distortion || 1;
+        const seed = options?.seed || 0;
+
+        // Use our NoisePatterns class
+        const noise = new NoisePatterns(seed);
+
+        // Track used points for rudimentary collision avoidance? 
+        // For simple flow fields, we allow overlap.
+
+        for (let i = 0; i < count; i++) {
+            // Random starting point
+            // Use the noise RNG or a simple seeded random
+            // We can reuse the noise generator's internal RNG by calling it with varying coords?
+            // Or just use Math.random() seeded? 
+            // Since we need reproducibility, let's use a simple seeded LCG or similar if available.
+            // But for now, we'll assume the Seeded Random from noise-patterns is accessible or just use a helper.
+            // Let's rely on a reliable sequence from our NoisePatterns instance context... 
+            // Actually NoisePatterns doesn't expose a range RNG.
+
+            // Re-implement a simple seeded random here for point distribution
+            const random = () => {
+                const s = Math.sin(seed + i * 12.9898) * 43758.5453;
+                return s - Math.floor(s);
+            };
+
+            let x = random() * safeWidth;
+            let y = (random() * 99999 % 1) * safeHeight; // simple hack to decorrelate y
+
+            const points: MakerJs.IPoint[] = [[x, y]];
+
+            for (let s = 0; s < maxSteps; s++) {
+                // Get angle from noise
+                // We map noise (-1..1 or 0..1) to angle
+                // Perlin/Simplex usually -1..1 or 0..1 depending on implementation
+                // Our NoisePatterns.simplex returns 0..1 now? No, simplex returns raw. 
+                // Let's use the 'get' method which returns 0..1 typically, or just use simplex directly.
+                // Our `get` normalizes. Let's use `get` with 'perlin' or 'simplex'.
+
+                const n = noise.get('simplex', x, y, { scale: noiseScale });
+                const angle = n * Math.PI * 2 * distortion;
+
+                const nextX = x + Math.cos(angle) * stepSize;
+                const nextY = y + Math.sin(angle) * stepSize;
+
+                // Stop if out of bounds
+                if (nextX < 0 || nextX > safeWidth || nextY < 0 || nextY > safeHeight) {
+                    break;
+                }
+
+                points.push([nextX, nextY]);
+                x = nextX;
+                y = nextY;
+            }
+
+            if (points.length > 1) {
+                // Simplify line?
+                model.paths![`f_${i}`] = new MakerJs.models.ConnectTheDots(false, points).paths![`ShapeLine1`];
+                // ConnectTheDots returns a model with paths. We just want one path if possible, 
+                // but ConnectTheDots might create multiple lines. 
+                // Actually ConnectTheDots creates a model where paths are line segments.
+                // We want a polyline? MakerJS doesn't implement Polyline as a single entity typically, it's a chain of lines.
+                // So we should add the model from ConnectTheDots as a sub-model.
+
+                model.models = model.models || {};
+                model.models[`line_${i}`] = new MakerJs.models.ConnectTheDots(false, points);
+            }
+        }
+
+        return model;
+    }
+
+    /**
+     * Superformula
+     * Generates complex organic shapes
+     */
+    static Superformula(
+        width: number,
+        height: number,
+        options?: {
+            radius?: number;
+            m?: number;
+            n1?: number;
+            n2?: number;
+            n3?: number;
+            a?: number;
+            b?: number;
+            stepSize?: number;
+            count?: number;
+            scaleStep?: number;
+            rotateStep?: number;
+            morphStep?: number;
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { models: {} };
+        const safeWidth = Number(width);
+        const safeHeight = Number(height);
+        const cx = safeWidth / 2;
+        const cy = safeHeight / 2;
+
+        let currentRadius = options?.radius || 50;
+        const m = options?.m ?? 0;
+        let n1 = options?.n1 || 1;
+        let n2 = options?.n2 || 1;
+        let n3 = options?.n3 || 1;
+        const a = options?.a || 1;
+        const b = options?.b || 1;
+
+        const count = Math.max(1, options?.count || 1);
+        const scaleStep = options?.scaleStep || 0.9;
+        const rotateStep = (options?.rotateStep || 0) * (Math.PI / 180); // Convert to radians
+        const morphStep = options?.morphStep || 0;
+
+        let currentRotation = 0;
+
+        // Resolution
+        const numPoints = 1000; // Optimal resolution
+        const phiStep = (Math.PI * 2) / numPoints;
+
+        for (let k = 0; k < count; k++) {
+            const points: MakerJs.IPoint[] = [];
+
+            for (let i = 0; i <= numPoints; i++) {
+                const phi = i * phiStep;
+
+                // Superformula: r = (|cos(m*phi/4)/a|^n2 + |sin(m*phi/4)/b|^n3)^(-1/n1)
+                let t1 = Math.cos(m * phi / 4) / a;
+                t1 = Math.abs(t1);
+                t1 = Math.pow(t1, n2);
+
+                let t2 = Math.sin(m * phi / 4) / b;
+                t2 = Math.abs(t2);
+                t2 = Math.pow(t2, n3);
+
+                const r = Math.pow(t1 + t2, -1 / n1);
+
+                if (!isFinite(r)) continue;
+
+                const finalR = r * currentRadius;
+
+                // Apply rotation
+                const theta = phi + currentRotation;
+
+                const x = cx + finalR * Math.cos(theta);
+                const y = cy + finalR * Math.sin(theta);
+
+                points.push([x, y]);
+            }
+
+            if (points.length > 2) {
+                model.models![`shape_${k}`] = new MakerJs.models.ConnectTheDots(true, points);
+            }
+
+            // Update state for next iteration
+            currentRadius *= scaleStep;
+            currentRotation += rotateStep;
+            n1 = Math.max(0.01, n1 + morphStep);
+            n2 = Math.max(0.01, n2 + morphStep);
+            n3 = Math.max(0.01, n3 + morphStep);
+
+            // Stop if too small
+            if (currentRadius < 1) break;
         }
 
         return model;
