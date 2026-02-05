@@ -1,0 +1,125 @@
+{
+  "sketch": "pipeline",
+  "outputBaseName": "test22",
+  "canvas": {
+    "height": 297,
+    "width": 420,
+    "margin": [
+      80,
+      80,
+      80,
+      80
+    ]
+  },
+  "gcode": {
+    "feedRate": 2500,
+    "travelRate": 3500,
+    "zUp": 2,
+    "zDown": -0.5,
+    "zSafe": 40,
+    "postProcessor": "linuxcnc",
+    "invertX": false,
+    "invertY": true,
+    "optimizePaths": true,
+    "joinTolerance": 0.1,
+    "dwellTime": 0
+  },
+  "params": {
+    "seed": 6895,
+    "layers": [
+      {
+        "id": "layer_1770310312648_778",
+        "name": "Base Layer Copy",
+        "steps": [
+          {
+            "tool": "honeycomb",
+            "params": {
+              "radius": 1.2,
+              "gap": 0,
+              "rotation": 0
+            }
+          },
+          {
+            "tool": "resample",
+            "params": {
+              "detail": 1
+            }
+          },
+          {
+            "tool": "warp",
+            "params": {
+              "type": "simplex",
+              "strength": 10,
+              "frequency": 0.0169,
+              "octaves": 1,
+              "persistence": 0.5,
+              "lacunarity": 2,
+              "distortion": 10,
+              "offsetX": 0,
+              "offsetY": 0,
+              "maskContrast": 1,
+              "maskBrightness": 0,
+              "patternContrast": 1,
+              "patternBrightness": 0
+            }
+          }
+        ],
+        "visible": true,
+        "color": "#000000",
+        "strokeWidth": 0.7
+      }
+    ],
+    "activeLayerId": "layer_1770310312648_778",
+    "steps": [
+      {
+        "tool": "duplicate",
+        "params": {
+          "id": "layer_1770310312648_778"
+        }
+      },
+      {
+        "tool": "honeycomb",
+        "params": {
+          "radius": 1.2,
+          "gap": 0,
+          "rotation": 0
+        }
+      },
+      {
+        "tool": "resample",
+        "params": {
+          "detail": 1
+        }
+      },
+      {
+        "tool": "warp",
+        "params": {
+          "type": "simplex",
+          "strength": 10,
+          "frequency": 0.0169,
+          "octaves": 1,
+          "persistence": 0.5,
+          "lacunarity": 2,
+          "distortion": 10,
+          "offsetX": 0,
+          "offsetY": 0,
+          "maskContrast": 1,
+          "maskBrightness": 0,
+          "patternContrast": 1,
+          "patternBrightness": 0
+        }
+      }
+    ],
+    "globalSteps": [
+      {
+        "tool": "clip",
+        "params": {
+          "top": 4,
+          "right": 4,
+          "bottom": 4,
+          "left": 4
+        }
+      }
+    ]
+  }
+}

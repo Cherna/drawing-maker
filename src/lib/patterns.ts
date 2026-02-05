@@ -470,6 +470,9 @@ export class Patterns {
     /**
      * Honeycomb (Hexagonal Grid)
      */
+    /**
+     * Honeycomb (Hexagonal Grid)
+     */
     static Honeycomb(
         width: number,
         height: number,
@@ -479,7 +482,7 @@ export class Patterns {
             rotation?: number; // Rotation in degrees
         }
     ): MakerJs.IModel {
-        const model: MakerJs.IModel = { models: {} };
+        const model: MakerJs.IModel = { models: {}, paths: {} };
         const safeWidth = Number(width);
         const safeHeight = Number(height);
         const r = options?.radius || 10;
@@ -491,31 +494,104 @@ export class Patterns {
         const vertStep = 1.5 * effectiveR;
         const horzStep = w;
 
-        const cols = Math.ceil(safeWidth / horzStep) + 1;
-        const rows = Math.ceil(safeHeight / vertStep) + 1;
+        // Calculate grid bounds
+        // Expand slightly to ensure we cover edges
+        const cols = Math.ceil(safeWidth / horzStep) + 2;
+        const rows = Math.ceil(safeHeight / vertStep) + 2;
+
+        const isConnected = gap <= 0.01;
+
+        // For connected honeycomb, we track unique edges to avoid double-drawing
+        const edges = new Map<string, MakerJs.IPath>();
+        const edgeKey = (p1: MakerJs.IPoint, p2: MakerJs.IPoint) => {
+            // Round to avoid float precision issues specific to checking equality
+            const precision = 3;
+            const x1 = Number(p1[0].toFixed(precision));
+            const y1 = Number(p1[1].toFixed(precision));
+            const x2 = Number(p2[0].toFixed(precision));
+            const y2 = Number(p2[1].toFixed(precision));
+
+            // Sort points to make key canonical (directionless)
+            if (x1 < x2 || (x1 === x2 && y1 < y2)) {
+                return `${x1},${y1}|${x2},${y2}`;
+            } else {
+                return `${x2},${y2}|${x1},${y1}`;
+            }
+        };
 
         let idx = 0;
+
         for (let j = -1; j <= rows; j++) {
-            for (let i = -1; i <= cols; i++) {
+            // Serpentine order for separated hexes to minimize travel
+            // (For connected hexes, the order matters less as we are collecting edges, 
+            // but might as well keep it for consistency or potential slight optimization in map insertion)
+            const isEvenRow = j % 2 === 0;
+            const iStart = -2;
+            const iEnd = cols;
+
+            // Create range array
+            const iRange: number[] = [];
+            for (let i = iStart; i <= iEnd; i++) iRange.push(i);
+
+            // Reverse for serpentine if needed (only matters for separated mode output order)
+            // If connected, we are just building a Set, so order is irrelevant for output.
+            if (!isEvenRow && !isConnected) {
+                iRange.reverse();
+            }
+
+            for (const i of iRange) {
                 const xOffset = (j % 2 !== 0) ? w / 2 : 0;
                 const cx = i * horzStep + xOffset;
                 const cy = j * vertStep;
 
-                if (cx < -r || cx > safeWidth + r || cy < -r || cy > safeHeight + r) continue;
+                // Bounds check - allow partial hexes if they overlap the drawing area
+                // Check if center is reasonably close to bounds
+                if (cx < -r * 2 || cx > safeWidth + r * 2 || cy < -r * 2 || cy > safeHeight + r * 2) continue;
 
+                // Calculate vertices
                 const points: MakerJs.IPoint[] = [];
                 for (let k = 0; k < 6; k++) {
-                    const ang = (30 + 60 * k) * Math.PI / 180 + rotation; // Apply rotation
+                    const ang = (30 + 60 * k) * Math.PI / 180 + rotation;
                     points.push([
                         cx + r * Math.cos(ang),
                         cy + r * Math.sin(ang)
                     ]);
                 }
 
-                const hex = new MakerJs.models.ConnectTheDots(true, points);
-                model.models![`h_${idx++}`] = hex;
+                if (isConnected) {
+                    // Add each edge to map
+                    for (let k = 0; k < 6; k++) {
+                        const p1 = points[k];
+                        const p2 = points[(k + 1) % 6];
+
+                        // Check if edge is within bounds (simplified clipping)
+                        // If both points are way outside, skip? 
+                        // Real logic: If we want to support clipping properly, we rely on the implementation 
+                        // to handle it later or we should check bounds.
+                        // For now, we add all generating edges and relying on 'clip' modifier later if user wants clipping.
+                        // But we should at least check if the edge is arguably relevant to the canvas.
+
+                        const key = edgeKey(p1, p2);
+                        if (!edges.has(key)) {
+                            edges.set(key, new MakerJs.paths.Line(p1, p2));
+                        }
+                    }
+                } else {
+                    // Separated - create closed hexagon model
+                    const hex = new MakerJs.models.ConnectTheDots(true, points);
+                    model.models![`h_${idx++}`] = hex;
+                }
             }
         }
+
+        if (isConnected) {
+            // Convert collected edges to paths
+            let edgeIdx = 0;
+            edges.forEach((line) => {
+                model.paths![`e_${edgeIdx++}`] = line;
+            });
+        }
+
         return model;
     }
 
