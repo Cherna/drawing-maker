@@ -75,6 +75,47 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'frequency', label: 'Frequency', type: 'number', min: 0.1, max: 10, step: 0.1, default: 3 },
     ],
   },
+  'gilbert': {
+    category: 'generator',
+    label: 'Hilbert Curve',
+    params: [
+      { key: 'scale', label: 'Scale', type: 'number', min: 1, max: 100, step: 0.1, default: 10 },
+    ],
+  },
+  'gyroid': {
+    category: 'generator',
+    label: 'Gyroid',
+    params: [
+      { key: 'scale', label: 'Scale', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1 },
+      { key: 'z', label: 'Z Slice', type: 'number', min: 0, max: 100, step: 0.1, default: 0 },
+      { key: 'threshold', label: 'Threshold', type: 'number', min: 0, max: 0.5, step: 0.01, default: 0.1 },
+    ],
+  },
+  'honeycomb': {
+    category: 'generator',
+    label: 'Honeycomb',
+    params: [
+      { key: 'radius', label: 'Radius', type: 'number', min: 1, max: 100, step: 1, default: 10 },
+      { key: 'gap', label: 'Gap', type: 'number', min: 0, max: 50, step: 0.5, default: 0 },
+    ],
+  },
+  'phyllotaxis': {
+    category: 'generator',
+    label: 'Phyllotaxis',
+    params: [
+      { key: 'count', label: 'Count', type: 'number', min: 10, max: 2000, step: 10, default: 500 },
+      { key: 'spacing', label: 'Spacing', type: 'number', min: 1, max: 20, step: 0.1, default: 5 },
+      { key: 'flower', label: 'Angle', type: 'number', min: 0, max: 360, step: 0.1, default: 137.5 },
+      { key: 'size', label: 'Point Size', type: 'number', min: 0, max: 20, step: 0.1, default: 0 },
+    ],
+  },
+  'isometric': {
+    category: 'generator',
+    label: 'Isometric Grid',
+    params: [
+      { key: 'size', label: 'Size', type: 'number', min: 5, max: 100, step: 1, default: 20 },
+    ],
+  },
   'hatching': {
     category: 'generator',
     label: 'Hatching',

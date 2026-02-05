@@ -111,6 +111,42 @@ const GENERATORS: Record<string, GeneratorFn> = {
             angle: params.angle,
             bidirectional: params.bidirectional
         });
+    },
+
+    'gilbert': (params, ctx, bounds) => {
+        return Patterns.Gilbert(bounds.width, bounds.height, {
+            scale: params.scale || 10
+        });
+    },
+
+    'gyroid': (params, ctx, bounds) => {
+        return Patterns.Gyroid(bounds.width, bounds.height, {
+            scale: params.scale,
+            z: params.z,
+            threshold: params.threshold
+        });
+    },
+
+    'honeycomb': (params, ctx, bounds) => {
+        return Patterns.Honeycomb(bounds.width, bounds.height, {
+            radius: params.radius,
+            gap: params.gap
+        });
+    },
+
+    'phyllotaxis': (params, ctx, bounds) => {
+        return Patterns.Phyllotaxis(bounds.width, bounds.height, {
+            count: params.count,
+            spacing: params.spacing,
+            flower: params.flower,
+            size: params.size
+        });
+    },
+
+    'isometric': (params, ctx, bounds) => {
+        return Patterns.IsometricGrid(bounds.width, bounds.height, {
+            size: params.size
+        });
     }
 };
 

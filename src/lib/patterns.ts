@@ -268,6 +268,333 @@ export class Patterns {
                 model.paths![`w_${row}_${seg}`] = new MakerJs.paths.Line([x1, y1], [x2, y2]);
             }
         }
+        return model;
+    }
+
+    /**
+     * Gilbert Curve (Generalized Randomized Hilbert Curve)
+     * Fills a generic rectangle.
+     */
+    static Gilbert(
+        width: number,
+        height: number,
+        options?: {
+            scale?: number; // Size of the grid cells.
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { paths: {} };
+        const safeWidth = Number(width);
+        const safeHeight = Number(height);
+
+        if (safeWidth <= 0 || safeHeight <= 0) return model;
+
+        const scale = Math.max(0.1, options?.scale || 10);
+
+        // Calculate grid dimensions
+        const cols = Math.max(1, Math.floor(safeWidth / scale));
+        const rows = Math.max(1, Math.floor(safeHeight / scale));
+
+        const points: MakerJs.IPoint[] = [];
+
+        // Center the pattern
+        const actualW = cols * scale;
+        const actualH = rows * scale;
+        const offsetX = (safeWidth - actualW) / 2;
+        const offsetY = (safeHeight - actualH) / 2;
+
+        const sgn = (mathX: number) => mathX > 0 ? 1 : (mathX < 0 ? -1 : 0);
+
+        // Generalized Hilbert Curve recursive function
+        const gilbert = (x: number, y: number, ax: number, ay: number, bx: number, by: number) => {
+            const w = Math.abs(ax + ay);
+            const h = Math.abs(bx + by);
+            const da = sgn(ax + ay);
+            const db = sgn(bx + by);
+
+            if (h === 1) {
+                // Line along A
+                const dx = sgn(ax);
+                const dy = sgn(ay);
+                for (let i = 0; i < w; i++)
+                    points.push([offsetX + (x + i * dx + 0.5) * scale, offsetY + (y + i * dy + 0.5) * scale]);
+                return;
+            }
+            if (w === 1) {
+                // Line along B
+                const dx = sgn(bx);
+                const dy = sgn(by);
+                for (let i = 0; i < h; i++)
+                    points.push([offsetX + (x + i * dx + 0.5) * scale, offsetY + (y + i * dy + 0.5) * scale]);
+                return;
+            }
+
+            // Split
+            let ax2 = Math.floor(w / 2) * sgn(ax);
+            let ay2 = Math.floor(w / 2) * sgn(ay);
+            let bx2 = Math.floor(h / 2) * sgn(bx);
+            let by2 = Math.floor(h / 2) * sgn(by);
+
+            // Remainder vectors
+            let axRem = ax - ax2;
+            let ayRem = ay - ay2;
+            let bxRem = bx - bx2;
+            let byRem = by - by2;
+
+            if (w > h) {
+                // Split A axis
+                gilbert(x, y, bx, by, ax2, ay2);
+                gilbert(x + ax2, y + ay2, axRem, ayRem, bx, by);
+            } else {
+                // Split B axis
+                gilbert(x, y, ax, ay, bx2, by2);
+                gilbert(
+                    x + bx2 + ax,
+                    y + by2 + ay,
+                    -ax,
+                    -ay,
+                    bxRem,
+                    byRem
+                );
+            }
+        };
+
+        // Start recursion
+        gilbert(0, 0, cols, 0, 0, rows);
+
+        const chain: MakerJs.IModel = { paths: {} };
+        for (let i = 0; i < points.length - 1; i++) {
+            chain.paths![`s_${i}`] = new MakerJs.paths.Line(points[i], points[i + 1]);
+        }
+
+        return chain;
+    }
+
+    /**
+     * Slices a 3D Gyroid at z.
+     */
+    static Gyroid(
+        width: number,
+        height: number,
+        options?: {
+            scale?: number;     // Zoom.
+            z?: number;         // Z-slice
+            threshold?: number; // Line thickness (creates double contour)
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { paths: {} };
+        const safeWidth = Number(width);
+        const safeHeight = Number(height);
+
+        if (safeWidth <= 0 || safeHeight <= 0) return model;
+
+        const scaleParam = Math.max(0.01, options?.scale || 1);
+        const scaleVal = scaleParam * 0.2; // Scaling factor for math
+        const z = (options?.z || 0) * scaleVal;
+        const threshold = Math.min(0.9, Math.max(0, options?.threshold || 0)); // 0 = single line, >0 = double line
+
+        // Calculate resolution to avoid aliasing
+        // Period is roughly 2PI / scaleVal.
+        // We want at least 10 samples per period.
+        const period = 2 * Math.PI / scaleVal;
+        const res = Math.max(1, Math.min(10, Math.floor(period / 10)));
+
+        // Function
+        const getVal = (x: number, y: number) => {
+            const sx = x * scaleVal;
+            const sy = y * scaleVal;
+            return Math.sin(sx) * Math.cos(sy) + Math.sin(sy) * Math.cos(z) + Math.sin(z) * Math.cos(sx);
+        };
+
+        // If threshold == 0, simple 0-iso (marching squares for >0)
+        // If threshold > 0, we want band between -th and +th? 
+        // Or lines at -th and +th.
+
+        const targets = threshold > 0 ? [-threshold, threshold] : [0];
+
+        targets.forEach((targetIso, targetIdx) => {
+            const cols = Math.ceil(safeWidth / res);
+            const rows = Math.ceil(safeHeight / res);
+
+            for (let j = 0; j < rows; j++) {
+                for (let i = 0; i < cols; i++) {
+                    const x0 = i * res;
+                    const y0 = j * res;
+                    const x1 = (i + 1) * res;
+                    const y1 = (j + 1) * res;
+
+                    // Get values relative to targetIso
+                    const v0 = getVal(x0, y0) - targetIso;
+                    const v1 = getVal(x1, y0) - targetIso;
+                    const v2 = getVal(x1, y1) - targetIso;
+                    const v3 = getVal(x0, y1) - targetIso;
+
+                    const b0 = v0 > 0 ? 1 : 0;
+                    const b1 = v1 > 0 ? 2 : 0;
+                    const b2 = v2 > 0 ? 4 : 0;
+                    const b3 = v3 > 0 ? 8 : 0;
+                    const type = b0 | b1 | b2 | b3;
+
+                    if (type === 0 || type === 15) continue;
+
+                    const lerp = (va: number, vb: number, posA: number, posB: number) => {
+                        if (Math.abs(vb - va) < 0.0001) return posA;
+                        return posA + (0 - va) / (vb - va) * (posB - posA);
+                    };
+
+                    const ptT = [lerp(v0, v1, x0, x1), y0] as MakerJs.IPoint;
+                    const ptR = [x1, lerp(v1, v2, y0, y1)] as MakerJs.IPoint;
+                    const ptB = [lerp(v3, v2, x0, x1), y1] as MakerJs.IPoint;
+                    const ptL = [x0, lerp(v0, v3, y0, y1)] as MakerJs.IPoint;
+
+                    const addLine = (currP1: MakerJs.IPoint, currP2: MakerJs.IPoint) => {
+                        model.paths![`g_${targetIdx}_${i}_${j}_${Math.random()}`] = new MakerJs.paths.Line(currP1, currP2);
+                    };
+
+                    switch (type) {
+                        case 1: case 14: addLine(ptL, ptT); break;
+                        case 2: case 13: addLine(ptT, ptR); break;
+                        case 3: case 12: addLine(ptL, ptR); break;
+                        case 4: case 11: addLine(ptR, ptB); break;
+                        case 5: addLine(ptL, ptT); addLine(ptR, ptB); break;
+                        case 6: case 9: addLine(ptT, ptB); break;
+                        case 7: case 8: addLine(ptL, ptB); break;
+                        case 10: addLine(ptL, ptB); addLine(ptT, ptR); break;
+                    }
+                }
+            }
+        });
+
+        return model;
+    }
+
+    /**
+     * Honeycomb (Hexagonal Grid)
+     */
+    static Honeycomb(
+        width: number,
+        height: number,
+        options?: {
+            radius?: number;
+            gap?: number;
+            // TODO: Rotation?
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { models: {} };
+        const safeWidth = Number(width);
+        const safeHeight = Number(height);
+        const r = options?.radius || 10;
+        const gap = options?.gap || 0;
+
+        const effectiveR = r + gap;
+        const w = Math.sqrt(3) * effectiveR;
+        const vertStep = 1.5 * effectiveR;
+        const horzStep = w;
+
+        const cols = Math.ceil(safeWidth / horzStep) + 1;
+        const rows = Math.ceil(safeHeight / vertStep) + 1;
+
+        let idx = 0;
+        for (let j = -1; j <= rows; j++) {
+            for (let i = -1; i <= cols; i++) {
+                const xOffset = (j % 2 !== 0) ? w / 2 : 0;
+                const cx = i * horzStep + xOffset;
+                const cy = j * vertStep;
+
+                if (cx < -r || cx > safeWidth + r || cy < -r || cy > safeHeight + r) continue;
+
+                const points: MakerJs.IPoint[] = [];
+                for (let k = 0; k < 6; k++) {
+                    const ang = (30 + 60 * k) * Math.PI / 180;
+                    points.push([
+                        cx + r * Math.cos(ang),
+                        cy + r * Math.sin(ang)
+                    ]);
+                }
+
+                const hex = new MakerJs.models.ConnectTheDots(true, points);
+                model.models![`h_${idx++}`] = hex;
+            }
+        }
+        return model;
+    }
+
+    /**
+     * Phyllotaxis (Sunflower Spiral)
+     */
+    static Phyllotaxis(
+        width: number,
+        height: number,
+        options?: {
+            count?: number;
+            spacing?: number;
+            flower?: number;
+            size?: number; // Point size
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { paths: {} };
+        const count = options?.count || 500;
+        const c = options?.spacing || 5;
+        const angleDeg = options?.flower || 137.5;
+        const angleRad = angleDeg * Math.PI / 180;
+        const pointSize = options?.size || 0; // 0 = auto
+
+        const cx = width / 2;
+        const cy = height / 2;
+
+        for (let n = 0; n < count; n++) {
+            const phi = n * angleRad;
+            const r = c * Math.sqrt(n);
+
+            const x = cx + r * Math.cos(phi);
+            const y = cy + r * Math.sin(phi);
+
+            const seedRadius = pointSize > 0 ? pointSize : Math.max(0.5, c / 3);
+            model.paths![`p_${n}`] = new MakerJs.paths.Circle([x, y], seedRadius);
+        }
+        return model;
+    }
+
+    /**
+     * Isometric Grid (Triangles)
+     */
+    static IsometricGrid(
+        width: number,
+        height: number,
+        options?: {
+            size?: number;
+        }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { models: {} };
+        const size = options?.size || 20;
+
+        // An Isometric grid is composed of 3 sets of parallel lines: 0, 60, 120 degrees.
+        // All intersecting at common points.
+
+        // Set 1: Horizontal (0 deg)
+        // Calculate spacing.
+        // For a triangle grid of side L (size), height is sqrt(3)/2 * L.
+        // The horizontal lines are spaced by this height.
+        const heightTri = (Math.sqrt(3) / 2) * size;
+
+        // We reuse the Hatching generator logic but need to be careful about line count/spacing.
+        // Hatching takes "count" over the diagonal.
+        // We want specific spacing.
+        // Let's implement manually using Hatching's underlying clipping logic but controlling precise spacing.
+
+        // Actually, Hatching(count) calculates spacing = diag / count.
+        // We want spacing = heightTri.
+        // So count = diag / heightTri.
+        const diag = Math.hypot(width, height);
+        const count = Math.ceil(diag / heightTri);
+
+        // 0 degrees
+        model.models!['iso_0'] = Patterns.Hatching(count, width, height, { angle: 0 });
+
+        // 60 degrees
+        model.models!['iso_60'] = Patterns.Hatching(count, width, height, { angle: 60 });
+
+        // 120 degrees
+        model.models!['iso_120'] = Patterns.Hatching(count, width, height, { angle: 120 });
 
         return model;
     }
@@ -275,6 +602,7 @@ export class Patterns {
     /**
      * Diagonal hatching
      */
+
     static Hatching(
         count: number,
         width: number,
