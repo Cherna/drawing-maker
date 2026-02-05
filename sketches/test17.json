@@ -48,18 +48,20 @@
           {
             "tool": "warp",
             "params": {
-              "type": "turbulence",
-              "strength": 16,
-              "frequency": 0.0054,
+              "type": "simplex",
+              "strength": 30.5,
+              "frequency": 0.0096,
               "octaves": 1,
               "persistence": 0.5,
               "lacunarity": 2,
               "distortion": 11,
               "offsetX": -22.4,
               "offsetY": 0,
-              "seed": 1,
-              "maskContrast": 3.1,
-              "maskBrightness": 0.85
+              "seed": 3,
+              "maskContrast": 1,
+              "maskBrightness": 0.3,
+              "patternContrast": 1,
+              "patternBrightness": -0.5
             }
           }
         ],
@@ -87,18 +89,20 @@
       {
         "tool": "warp",
         "params": {
-          "type": "turbulence",
-          "strength": 16,
-          "frequency": 0.0054,
+          "type": "simplex",
+          "strength": 30.5,
+          "frequency": 0.0096,
           "octaves": 1,
           "persistence": 0.5,
           "lacunarity": 2,
           "distortion": 11,
           "offsetX": -22.4,
           "offsetY": 0,
-          "seed": 1,
-          "maskContrast": 3.1,
-          "maskBrightness": 0.85
+          "seed": 3,
+          "maskContrast": 1,
+          "maskBrightness": 0.3,
+          "patternContrast": 1,
+          "patternBrightness": -0.5
         }
       }
     ],
@@ -106,9 +110,9 @@
       {
         "tool": "clip",
         "params": {
-          "top": 10,
+          "top": 20,
           "right": 10,
-          "bottom": 10,
+          "bottom": 20,
           "left": 10
         }
       }
