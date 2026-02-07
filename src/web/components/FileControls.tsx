@@ -1,21 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfigStore } from '../store/config-store';
 import { Button } from './ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator
-} from './ui/dropdown-menu';
-import { Save, FolderOpen, FilePlus, RefreshCw, Trash2, ChevronDown } from 'lucide-react';
+// DropdownMenu imports removed
+import { Save, FolderOpen, FilePlus, RefreshCw, Trash2 } from 'lucide-react';
+
+import { SketchBrowser } from './SketchBrowser';
 
 export default function FileControls() {
     const { config, setConfig, isDirty, markClean } = useConfigStore();
     const [activeFile, setActiveFile] = useState<string | null>(null);
     const [sketches, setSketches] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 
     const refreshSketches = useCallback(async () => {
         try {
@@ -223,27 +219,46 @@ export default function FileControls() {
             </div>
 
             <div className="flex gap-2">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="flex-1 h-8 justify-between text-sm px-3 font-normal">
-                            <span className="truncate">{activeFile || 'Load sketch...'}</span>
-                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-80 max-h-[300px] overflow-y-auto">
-                        <DropdownMenuLabel>Saved Sketches</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {sketches.length === 0 ? (
-                            <div className="p-2 text-xs text-muted-foreground text-center">No sketches found</div>
-                        ) : (
-                            sketches.map((file) => (
-                                <DropdownMenuItem key={file} onClick={() => loadSketch(file)}>
-                                    {file.replace('.json', '')}
-                                </DropdownMenuItem>
-                            ))
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <Button
+                    variant="outline"
+                    className="flex-1 h-8 justify-between text-sm px-3 font-normal"
+                    onClick={() => setIsBrowserOpen(true)}
+                >
+                    <span className="truncate">{activeFile || 'Load sketch...'}</span>
+                    <FolderOpen className="h-4 w-4 opacity-50 ml-2" />
+                </Button>
+
+                <SketchBrowser
+                    isOpen={isBrowserOpen}
+                    onClose={() => setIsBrowserOpen(false)}
+                    sketches={sketches}
+                    onLoad={loadSketch}
+                    onDelete={async (filename) => {
+                        setIsLoading(true);
+                        try {
+                            const res = await fetch(`http://localhost:3000/api/sketches/${filename}`, {
+                                method: 'DELETE'
+                            });
+
+                            if (res.ok) {
+                                if (activeFile === filename.replace('.json', '')) {
+                                    setActiveFile(null);
+                                }
+                                refreshSketches();
+                            } else {
+                                throw new Error('Failed to delete');
+                            }
+                        } catch (e) {
+                            console.error('Failed to delete sketch:', e);
+                            alert('Failed to delete sketch');
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    }}
+                    isLoading={isLoading}
+                    activeSketch={activeFile}
+                />
+
                 <Button
                     variant="ghost"
                     size="icon"

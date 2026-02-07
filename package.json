@@ -35,6 +35,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.3",
+    "sharp": "^0.34.5",
     "simplex-noise": "^4.0.0",
     "tailwind-merge": "^2.2.0",
     "zod": "^3.22.4",

@@ -262,9 +262,66 @@ app.post('/api/export', async (req, res) => {
     }
 });
 
+import sharp from 'sharp';
+
 const SKETCHES_DIR = path.join(__dirname, '../../sketches');
+const THUMBNAILS_DIR = path.join(SKETCHES_DIR, '_thumbnails');
+
 if (!fs.existsSync(SKETCHES_DIR)) {
     fs.mkdirSync(SKETCHES_DIR);
+}
+if (!fs.existsSync(THUMBNAILS_DIR)) {
+    fs.mkdirSync(THUMBNAILS_DIR);
+}
+
+// Helper: Generate thumbnail PNG
+async function generateThumbnail(config: AppConfig): Promise<Buffer> {
+    const previewConfig = createPreviewConfig(config);
+    const layers = previewConfig.params?.layers as Layer[] | undefined;
+
+    let finalModel: MakerJs.IModel = { models: {} };
+    const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
+
+    if (layers && layers.length > 0) {
+        const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed);
+
+        for (const layer of layers) {
+            if (!layer.visible) continue;
+            const model = layerModels.get(layer.id);
+            if (!model) continue;
+
+            layerData.set(layer.id, {
+                model,
+                color: layer.color || '#000000',
+                opacity: layer.opacity,
+                strokeWidth: layer.strokeWidth
+            });
+            finalModel.models![layer.id] = model;
+        }
+
+        if (previewConfig.params.globalSteps && previewConfig.params.globalSteps.length > 0) {
+            finalModel = await Pipeline.executeOnModel(finalModel, previewConfig.params.globalSteps, previewConfig.canvas, previewConfig.params.seed);
+            // Re-map modified models back to layerData for SVG generation
+            if (finalModel.models) {
+                for (const layer of layers) {
+                    if (finalModel.models[layer.id]) {
+                        const data = layerData.get(layer.id);
+                        if (data) {
+                            data.model = finalModel.models[layer.id];
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        const sketch = new PipelineSketch();
+        const model = await sketch.generate(previewConfig.canvas, previewConfig.params);
+        finalModel = model;
+        layerData.set('default', { model, color: '#000000' });
+    }
+
+    const svg = layersToSVG(layerData, previewConfig.canvas);
+    return sharp(Buffer.from(svg)).png().resize(800).toBuffer();
 }
 
 // API: Save sketch
@@ -297,6 +354,23 @@ app.post('/api/save', async (req, res) => {
         fs.writeFileSync(filePath, JSON.stringify(config, null, 2));
         console.log(`Saved sketch to ${filePath}`);
 
+        // Generate and save thumbnail
+        try {
+            const pngBuffer = await generateThumbnail(config);
+            const thumbPath = path.join(THUMBNAILS_DIR, safeFilename.replace('.json', '.png'));
+            const oldSvgPath = path.join(THUMBNAILS_DIR, safeFilename.replace('.json', '.svg'));
+
+            // Clean up old SVG if it exists
+            if (fs.existsSync(oldSvgPath)) {
+                fs.unlinkSync(oldSvgPath);
+            }
+
+            fs.writeFileSync(thumbPath, pngBuffer);
+            console.log(`Saved thumbnail to ${thumbPath}`);
+        } catch (err) {
+            console.error('Failed to generate thumbnail during save:', err);
+        }
+
         res.json({ success: true, filename: safeFilename });
     } catch (error: any) {
         console.error('Save error:', error);
@@ -307,8 +381,82 @@ app.post('/api/save', async (req, res) => {
 // API: List sketches
 app.get('/api/sketches', async (req, res) => {
     try {
-        const files = fs.readdirSync(SKETCHES_DIR).filter(f => f.endsWith('.json'));
+        const files = fs.readdirSync(SKETCHES_DIR)
+            .filter(f => f.endsWith('.json'))
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+        // Optional: Check for thumbnails?
+        // For now, client just blindly tries to load them
+
         res.json({ files });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Serve thumbnail
+app.get('/api/thumbnails/:filename', async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const thumbPath = path.join(THUMBNAILS_DIR, filename);
+
+        if (fs.existsSync(thumbPath)) {
+            res.sendFile(thumbPath);
+        } else {
+            res.status(404).send('Thumbnail not found');
+        }
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Regenerate thumbnails
+app.post('/api/regenerate-thumbnails', async (req, res) => {
+    try {
+        const files = fs.readdirSync(SKETCHES_DIR).filter(f => f.endsWith('.json'));
+        let count = 0;
+        let errors = 0;
+
+        console.log(`Starting batch thumbnail generation for ${files.length} sketches...`);
+
+        for (const file of files) {
+            try {
+                const sketchPath = path.join(SKETCHES_DIR, file);
+                const thumbPath = path.join(THUMBNAILS_DIR, file.replace('.json', '.png'));
+                const oldSvgPath = path.join(THUMBNAILS_DIR, file.replace('.json', '.svg'));
+
+                // Clean up old SVG if it exists
+                if (fs.existsSync(oldSvgPath)) {
+                    fs.unlinkSync(oldSvgPath);
+                }
+
+                // Smart incremental generation:
+                // If thumbnail exists and is newer than the sketch, skip it
+                if (fs.existsSync(thumbPath)) {
+                    const sketchStats = fs.statSync(sketchPath);
+                    const thumbStats = fs.statSync(thumbPath);
+
+                    if (thumbStats.mtime > sketchStats.mtime) {
+                        // Thumbnail is up to date
+                        continue;
+                    }
+                }
+
+                const content = fs.readFileSync(sketchPath, 'utf8');
+                const config = JSON.parse(content);
+                const pngBuffer = await generateThumbnail(config);
+
+                fs.writeFileSync(thumbPath, pngBuffer);
+                count++;
+                if (count % 5 === 0) console.log(`Generated ${count}/${files.length}...`);
+            } catch (err) {
+                console.error(`Failed to generate thumbnail for ${file}:`, err);
+                errors++;
+            }
+        }
+
+        console.log(`Thumbnail generation complete. Generated: ${count}, Errors: ${errors}`);
+        res.json({ success: true, count, errors });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -343,6 +491,14 @@ app.delete('/api/sketches/:filename', async (req, res) => {
 
         fs.unlinkSync(filePath);
         console.log(`Deleted sketch: ${filePath}`);
+
+        // Cleanup thumbnails
+        const thumbPng = path.join(THUMBNAILS_DIR, filename.replace('.json', '.png'));
+        const thumbSvg = path.join(THUMBNAILS_DIR, filename.replace('.json', '.svg'));
+
+        if (fs.existsSync(thumbPng)) fs.unlinkSync(thumbPng);
+        if (fs.existsSync(thumbSvg)) fs.unlinkSync(thumbSvg);
+
         res.json({ success: true, filename });
     } catch (error: any) {
         console.error('Delete error:', error);
