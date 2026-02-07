@@ -157,6 +157,10 @@ const GENERATORS: Record<string, GeneratorFn> = {
             steps: params.steps,
             noiseScale: params.noiseScale,
             distortion: params.distortion,
+            noiseType: params.noiseType,
+            octaves: params.octaves,
+            persistence: params.persistence,
+            lacunarity: params.lacunarity,
             seed: params.seed
         });
     },

@@ -793,6 +793,10 @@ export class Patterns {
             steps?: number;
             noiseScale?: number;
             distortion?: number;
+            noiseType?: string;
+            octaves?: number;
+            persistence?: number;
+            lacunarity?: number;
             seed?: number;
         }
     ): MakerJs.IModel {
@@ -805,46 +809,40 @@ export class Patterns {
         const count = options?.count || 500;
         const stepSize = options?.stepSize || 1;
         const maxSteps = options?.steps || 100;
-        const noiseScale = options?.noiseScale || 0.01;
+        const noiseScale = options?.noiseScale || 0.002;
         const distortion = options?.distortion || 1;
         const seed = options?.seed || 0;
+        const noiseType = options?.noiseType || 'simplex';
+
+        // Noise Params
+        const noiseParams = {
+            scale: noiseScale,
+            octaves: options?.octaves || 1,
+            persistence: options?.persistence || 0.5,
+            lacunarity: options?.lacunarity || 2,
+            distortion: 0 // Not relevant for flow field angle itself usually, or we could use it?
+            // Actually 'distortion' param in options acts as 'Angle Scale' here.
+        };
 
         // Use our NoisePatterns class
         const noise = new NoisePatterns(seed);
 
-        // Track used points for rudimentary collision avoidance? 
-        // For simple flow fields, we allow overlap.
+        // Simple seeded random for starting positions
+        const rng = seededRandom(seed);
 
         for (let i = 0; i < count; i++) {
-            // Random starting point
-            // Use the noise RNG or a simple seeded random
-            // We can reuse the noise generator's internal RNG by calling it with varying coords?
-            // Or just use Math.random() seeded? 
-            // Since we need reproducibility, let's use a simple seeded LCG or similar if available.
-            // But for now, we'll assume the Seeded Random from noise-patterns is accessible or just use a helper.
-            // Let's rely on a reliable sequence from our NoisePatterns instance context... 
-            // Actually NoisePatterns doesn't expose a range RNG.
-
-            // Re-implement a simple seeded random here for point distribution
-            const random = () => {
-                const s = Math.sin(seed + i * 12.9898) * 43758.5453;
-                return s - Math.floor(s);
-            };
-
-            let x = random() * safeWidth;
-            let y = (random() * 99999 % 1) * safeHeight; // simple hack to decorrelate y
+            let x = rng() * safeWidth;
+            let y = rng() * safeHeight;
 
             const points: MakerJs.IPoint[] = [[x, y]];
 
             for (let s = 0; s < maxSteps; s++) {
-                // Get angle from noise
-                // We map noise (-1..1 or 0..1) to angle
-                // Perlin/Simplex usually -1..1 or 0..1 depending on implementation
-                // Our NoisePatterns.simplex returns 0..1 now? No, simplex returns raw. 
-                // Let's use the 'get' method which returns 0..1 typically, or just use simplex directly.
-                // Our `get` normalizes. Let's use `get` with 'perlin' or 'simplex'.
+                // Get value from noise
+                const n = noise.get(noiseType as any, x, y, noiseParams, seed);
 
-                const n = noise.get('simplex', x, y, { scale: noiseScale });
+                // Map to angle
+                // Noise is typically 0..1 (from noise.get)
+                // Map to 0..2PI
                 const angle = n * Math.PI * 2 * distortion;
 
                 const nextX = x + Math.cos(angle) * stepSize;
@@ -861,14 +859,9 @@ export class Patterns {
             }
 
             if (points.length > 1) {
-                // Simplify line?
-                model.paths![`f_${i}`] = new MakerJs.models.ConnectTheDots(false, points).paths![`ShapeLine1`];
-                // ConnectTheDots returns a model with paths. We just want one path if possible, 
-                // but ConnectTheDots might create multiple lines. 
-                // Actually ConnectTheDots creates a model where paths are line segments.
-                // We want a polyline? MakerJS doesn't implement Polyline as a single entity typically, it's a chain of lines.
-                // So we should add the model from ConnectTheDots as a sub-model.
-
+                // Use ConnectTheDots to create the path
+                // We store each line as a separate model to ensure it's treated as a polyline if possible,
+                // or just a path if ConnectTheDots returns a single path (it returns a model with paths usually).
                 model.models = model.models || {};
                 model.models[`line_${i}`] = new MakerJs.models.ConnectTheDots(false, points);
             }

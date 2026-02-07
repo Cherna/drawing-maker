@@ -122,10 +122,15 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     label: 'Flow Field',
     params: [
       { key: 'count', label: 'Line Count', type: 'number', min: 10, max: 10000, step: 10, default: 500 },
-      { key: 'steps', label: 'Line Length', type: 'number', min: 1, max: 10000, step: 1, default: 500 },
+      { key: 'steps', label: 'Line Length', type: 'number', min: 1, max: 1000, step: 1, default: 100 },
       { key: 'stepSize', label: 'Step Size', type: 'number', min: 0.1, max: 20, step: 0.1, default: 1 },
       { key: 'noiseScale', label: 'Noise Scale', type: 'number', min: 0.0001, max: 0.1, step: 0.0001, default: 0.002 },
-      { key: 'distortion', label: 'Distortion', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1 },
+      { key: 'distortion', label: 'Angle Scale', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1 },
+      { key: 'noiseType', label: 'Noise Type', type: 'select', options: ['simplex', 'perlin', 'turbulence', 'marble', 'cells'], default: 'simplex' },
+      { key: 'octaves', label: 'Octaves', type: 'number', min: 1, max: 8, step: 1, default: 1, showIf: (p) => p.noiseType !== 'cells' },
+      { key: 'persistence', label: 'Persistence', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5, showIf: (p) => p.noiseType !== 'cells' },
+      { key: 'lacunarity', label: 'Lacunarity', type: 'number', min: 1, max: 4, step: 0.1, default: 2, showIf: (p) => p.noiseType !== 'cells' },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 99999, step: 1 },
     ],
   },
   'superformula': {

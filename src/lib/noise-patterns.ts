@@ -196,14 +196,42 @@ export class NoisePatterns {
         return Math.abs(hash % 10000) / 10000;
     }
 
+    // Generic FBM
+    private fbmGeneric(x: number, y: number, params: NoiseParams, noiseFn: (x: number, y: number) => number): number {
+        let t = 0;
+        let frequency = params.scale;
+        let amplitude = 1;
+        let maxVal = 0;
+
+        const octaves = params.octaves || 1;
+        const persistence = params.persistence || 0.5;
+        const lacunarity = params.lacunarity || 2;
+
+        for (let i = 0; i < octaves; i++) {
+            t += noiseFn(x * frequency, y * frequency) * amplitude;
+            maxVal += amplitude;
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
+
+        return t / maxVal;
+    }
+
     // General access
     get(type: NoiseType, x: number, y: number, params: NoiseParams, seed?: number): number {
         switch (type) {
-            case 'simplex':
-                return (this.simplex(x, y, params.scale) + 1) / 2; // Normalize -1..1 to 0..1
-            case 'perlin':
-                // Perlin is typically -1..1 (approx), normalize to 0..1
-                return (this.perlin2D(x * params.scale, y * params.scale) + 1) / 2;
+            case 'simplex': {
+                // FBM for simplex (if octaves=1 it's just simplex)
+                // Normalize -1..1 to 0..1
+                const val = this.fbmGeneric(x, y, params, (nx, ny) => this.noise2D(nx, ny));
+                return (val + 1) / 2;
+            }
+            case 'perlin': {
+                // FBM for perlin
+                // Normalize -1..1 to 0..1
+                const val = this.fbmGeneric(x, y, params, (nx, ny) => this.perlin2D(nx, ny));
+                return (val + 1) / 2;
+            }
             case 'turbulence':
                 return this.turbulence(x, y, params);
             case 'marble':
