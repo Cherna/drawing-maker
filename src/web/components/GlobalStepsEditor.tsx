@@ -1,5 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
+import { Button } from './ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+} from './ui/dropdown-menu';
+import CollapsibleMenuSection from './ui/collapsible-menu-section';
+import { ChevronDown } from 'lucide-react';
+
 import { useConfigStore } from '../store/config-store';
 import { PipelineStep } from '../../types';
 import GlobalStepItem from './GlobalStepItem';
@@ -40,19 +49,23 @@ export default function GlobalStepsEditor() {
                     steps.map((step, index) => <GlobalStepItem key={index} step={step} index={index} />)
                 )}
 
-                <Select onValueChange={handleAddTool}>
-                    <SelectTrigger className="w-full h-9 text-sm">
-                        <span className="text-muted-foreground">+ Add modifier...</span>
-                    </SelectTrigger>
-                    <SelectContent>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Modifiers</div>
-                        {MODIFIERS.map((tool) => (
-                            <SelectItem key={tool} value={tool}>
-                                {TOOL_DEFINITIONS[tool]?.label || tool}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full h-9 justify-between text-muted-foreground font-normal bg-background">
+                            + Add modifier...
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64 max-h-[400px] overflow-y-auto">
+                        <CollapsibleMenuSection title="Modifiers" defaultExpanded={true}>
+                            {MODIFIERS.map((tool) => (
+                                <DropdownMenuItem key={tool} onClick={() => handleAddTool(tool)}>
+                                    {TOOL_DEFINITIONS[tool]?.label || tool}
+                                </DropdownMenuItem>
+                            ))}
+                        </CollapsibleMenuSection>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </CardContent>
         </Card>
     );

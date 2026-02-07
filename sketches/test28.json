@@ -1,0 +1,122 @@
+{
+  "sketch": "pipeline",
+  "outputBaseName": "test",
+  "canvas": {
+    "height": 297,
+    "width": 420,
+    "margin": [
+      80,
+      80,
+      80,
+      80
+    ],
+    "showAxisIndicator": false
+  },
+  "gcode": {
+    "feedRate": 2500,
+    "travelRate": 3500,
+    "zUp": 2,
+    "zDown": -0.5,
+    "zSafe": 40,
+    "postProcessor": "linuxcnc",
+    "invertX": false,
+    "invertY": true,
+    "optimizePaths": true,
+    "joinTolerance": 0.1,
+    "dwellTime": 0
+  },
+  "params": {
+    "seed": 7560,
+    "layers": [
+      {
+        "id": "base",
+        "name": "Base Layer",
+        "steps": [
+          {
+            "tool": "truchet",
+            "params": {
+              "tileSize": 4,
+              "style": 1,
+              "radiusFactor": 0.5,
+              "seed": 0
+            }
+          },
+          {
+            "tool": "resample",
+            "params": {
+              "detail": 2
+            }
+          },
+          {
+            "tool": "warp",
+            "params": {
+              "type": "marble",
+              "strength": 14.5,
+              "frequency": 0.0075,
+              "octaves": 1,
+              "persistence": 0.5,
+              "lacunarity": 2,
+              "distortion": 10,
+              "offsetX": 0,
+              "offsetY": 0,
+              "maskContrast": 1,
+              "maskBrightness": 0,
+              "patternContrast": 0.7,
+              "patternBrightness": 0
+            }
+          }
+        ],
+        "visible": true,
+        "strokeWidth": 0.7,
+        "color": "#000000"
+      }
+    ],
+    "activeLayerId": "base",
+    "steps": [
+      {
+        "tool": "truchet",
+        "params": {
+          "tileSize": 4,
+          "style": 1,
+          "radiusFactor": 0.5,
+          "seed": 0
+        }
+      },
+      {
+        "tool": "resample",
+        "params": {
+          "detail": 2
+        }
+      },
+      {
+        "tool": "warp",
+        "params": {
+          "type": "marble",
+          "strength": 14.5,
+          "frequency": 0.0075,
+          "octaves": 1,
+          "persistence": 0.5,
+          "lacunarity": 2,
+          "distortion": 10,
+          "offsetX": 0,
+          "offsetY": 0,
+          "maskContrast": 1,
+          "maskBrightness": 0,
+          "patternContrast": 0.7,
+          "patternBrightness": 0
+        }
+      }
+    ],
+    "globalSteps": [
+      {
+        "tool": "clip",
+        "params": {
+          "top": 6,
+          "right": 6,
+          "bottom": 6,
+          "left": 6
+        }
+      }
+    ]
+  }
+}

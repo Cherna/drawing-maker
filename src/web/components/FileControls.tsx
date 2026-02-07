@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfigStore } from '../store/config-store';
 import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Save, FolderOpen, FilePlus, RefreshCw, Trash2 } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator
+} from './ui/dropdown-menu';
+import { Save, FolderOpen, FilePlus, RefreshCw, Trash2, ChevronDown } from 'lucide-react';
 
 export default function FileControls() {
     const { config, setConfig, isDirty, markClean } = useConfigStore();
@@ -216,21 +223,27 @@ export default function FileControls() {
             </div>
 
             <div className="flex gap-2">
-                <Select
-                    value={activeFile ? `${activeFile}.json` : ''}
-                    onValueChange={(val) => loadSketch(val)}
-                >
-                    <SelectTrigger className="flex-1 h-8 text-sm">
-                        <SelectValue placeholder="Load sketch..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {sketches.map((file) => (
-                            <SelectItem key={file} value={file}>
-                                {file.replace('.json', '')}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="flex-1 h-8 justify-between text-sm px-3 font-normal">
+                            <span className="truncate">{activeFile || 'Load sketch...'}</span>
+                            <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-80 max-h-[300px] overflow-y-auto">
+                        <DropdownMenuLabel>Saved Sketches</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {sketches.length === 0 ? (
+                            <div className="p-2 text-xs text-muted-foreground text-center">No sketches found</div>
+                        ) : (
+                            sketches.map((file) => (
+                                <DropdownMenuItem key={file} onClick={() => loadSketch(file)}>
+                                    {file.replace('.json', '')}
+                                </DropdownMenuItem>
+                            ))
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                     variant="ghost"
                     size="icon"

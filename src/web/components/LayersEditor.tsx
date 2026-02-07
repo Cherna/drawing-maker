@@ -5,7 +5,16 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { useConfigStore } from '../store/config-store';
 import { PipelineStep, Layer } from '../../types';
 import LayerStepItem from './LayerStepItem';
-import { Plus, Copy, Trash2, Eye, EyeOff, Download } from 'lucide-react';
+import { Plus, Copy, Trash2, Eye, EyeOff, Download, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator
+} from './ui/dropdown-menu';
+import CollapsibleMenuSection from './ui/collapsible-menu-section';
 import { GENERATORS, MODIFIERS, TOOL_DEFINITIONS } from '../lib/tool-definitions';
 
 // Default color palette for new layers
@@ -518,37 +527,40 @@ export default function LayersEditor() {
         </div>
 
         {/* Add Step */}
-        <Select value="" onValueChange={handleAddStep}>
-          <SelectTrigger className="w-full h-9 text-sm">
-            <span className="text-muted-foreground">
+        {/* Add Step */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-full h-9 justify-between text-muted-foreground font-normal bg-background">
               + Add step...
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Generators</div>
-            {GENERATORS.map((tool) => (
-              <SelectItem key={tool} value={tool}>
-                {TOOL_DEFINITIONS[tool]?.label || tool}
-              </SelectItem>
-            ))}
-            {/* Only show modifiers if they can be used */}
-            {canAddModifiers && (
-              <>
-                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Modifiers</div>
-                {MODIFIERS.filter(t => t !== 'duplicate' && t !== 'merge' && t !== 'layer' && t !== 'clone').map((tool) => (
-                  <SelectItem key={tool} value={tool}>
-                    {TOOL_DEFINITIONS[tool]?.label || tool}
-                  </SelectItem>
-                ))}
-              </>
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-64 max-h-[400px] overflow-y-auto">
+            <CollapsibleMenuSection title="Generators" defaultExpanded={true}>
+              {GENERATORS.map((tool) => (
+                <DropdownMenuItem key={tool} onClick={() => handleAddStep(tool)}>
+                  {TOOL_DEFINITIONS[tool]?.label || tool}
+                </DropdownMenuItem>
+              ))}
+            </CollapsibleMenuSection>
+
+            {(canAddModifiers || activeLayerId !== 'base') && (
+              <CollapsibleMenuSection title="Modifiers" defaultExpanded={true}>
+                {canAddModifiers ? (
+                  MODIFIERS.filter(t => t !== 'duplicate' && t !== 'merge' && t !== 'layer' && t !== 'clone').map((tool) => (
+                    <DropdownMenuItem key={tool} onClick={() => handleAddStep(tool)}>
+                      {TOOL_DEFINITIONS[tool]?.label || tool}
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-2 text-xs text-muted-foreground italic">
+                    Add generators to base layer first to enable modifiers
+                  </div>
+                )}
+              </CollapsibleMenuSection>
             )}
-            {!canAddModifiers && activeLayerId !== 'base' && (
-              <div className="px-2 py-2 text-xs text-muted-foreground italic">
-                Add generators to base layer first to enable modifiers
-              </div>
-            )}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Layer explanation */}
         {activeLayerId !== 'base' && (

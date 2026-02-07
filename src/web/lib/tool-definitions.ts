@@ -114,7 +114,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     category: 'generator',
     label: 'Isometric Grid',
     params: [
-      { key: 'size', label: 'Size', type: 'number', min: 5, max: 100, step: 1, default: 20 },
+      { key: 'size', label: 'Size', type: 'number', min: 0.1, max: 100, step: 0.1, default: 20 },
     ],
   },
   'flow-field': {
@@ -122,7 +122,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     label: 'Flow Field',
     params: [
       { key: 'count', label: 'Line Count', type: 'number', min: 10, max: 10000, step: 10, default: 500 },
-      { key: 'steps', label: 'Line Length', type: 'number', min: 10, max: 10000, step: 10, default: 500 },
+      { key: 'steps', label: 'Line Length', type: 'number', min: 1, max: 10000, step: 1, default: 500 },
       { key: 'stepSize', label: 'Step Size', type: 'number', min: 0.1, max: 20, step: 0.1, default: 1 },
       { key: 'noiseScale', label: 'Noise Scale', type: 'number', min: 0.0001, max: 0.1, step: 0.0001, default: 0.002 },
       { key: 'distortion', label: 'Distortion', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1 },
