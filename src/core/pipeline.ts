@@ -444,6 +444,27 @@ const MODIFIERS: Record<string, ModifierFn> = {
                         dy: Math.sin(x * freq * Math.PI * 2) * strength * (params.vertical ? 1 : 0)
                     });
                     break;
+                case 'cubes':
+                    const cubeParams = {
+                        ...params,
+                        scale: params.frequency || params.scale || 0.05,
+                        offsetX: params.offsetX || 0,
+                        offsetY: params.offsetY || 0
+                    };
+                    // Bounds not strictly needed for cubes as it is coordinate based
+                    const cubeFn = Masks.cubes(cubeParams, { x: 0, y: 0, width: 0, height: 0 });
+
+                    warpFn = (x, y) => {
+                        const v = cubeFn(x, y);
+                        // v is 0, 0.5, 1
+                        // Map 0 -> -0.5, 0.5 -> 0, 1 -> 0.5
+                        const d = (v - 0.5) * 2; // -1, 0, 1
+                        return {
+                            dx: d * strength,
+                            dy: d * strength
+                        };
+                    };
+                    break;
                 default:
                     warpFn = () => ({ dx: 0, dy: 0 });
             }

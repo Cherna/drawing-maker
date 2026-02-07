@@ -273,7 +273,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     label: 'Warp',
     hasMask: true,
     params: [
-      { key: 'type', label: 'Type', type: 'select', options: ['bulge', 'pinch', 'twist', 'wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells'], default: 'bulge' },
+      { key: 'type', label: 'Type', type: 'select', options: ['bulge', 'pinch', 'twist', 'wave', 'simplex', 'perlin', 'turbulence', 'cubes', 'marble', 'cells'], default: 'bulge' },
       { key: 'strength', label: 'Strength', type: 'number', min: 0, max: 50, step: 0.5, default: 10 },
       {
         key: 'frequency',
@@ -283,7 +283,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         max: 0.5,
         step: 0.0001,
         default: 0.05,
-        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'].includes(p.type)
       },
       {
         key: 'octaves',
@@ -326,6 +326,43 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         showIf: (p) => ['marble'].includes(p.type)
       },
       {
+        key: 'bevel',
+        label: 'Slope (Distortion)',
+        type: 'boolean',
+        default: false,
+        showIf: (p) => ['cubes'].includes(p.type)
+      },
+      {
+        key: 'jitter',
+        label: 'Jitter',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.01,
+        default: 0,
+        showIf: (p) => ['cubes'].includes(p.type)
+      },
+      {
+        key: 'spacing',
+        label: 'Spacing',
+        type: 'number',
+        min: 0,
+        max: 0.9,
+        step: 0.01,
+        default: 0,
+        showIf: (p) => ['cubes'].includes(p.type)
+      },
+      {
+        key: 'rotation',
+        label: 'Rotation',
+        type: 'number',
+        min: 0,
+        max: 360,
+        step: 1,
+        default: 0,
+        showIf: (p) => ['cubes'].includes(p.type)
+      },
+      {
         key: 'offsetX',
         label: 'Offset X',
         type: 'number',
@@ -333,7 +370,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         max: 500,
         step: 0.1,
         default: 0,
-        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'].includes(p.type)
       },
       {
         key: 'offsetY',
@@ -343,14 +380,14 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         max: 500,
         step: 0.1,
         default: 0,
-        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type)
+        showIf: (p) => ['wave', 'simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'].includes(p.type)
       },
       { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 99999, step: 1 },
       { key: 'maskContrast', label: 'Mask Contrast', type: 'number', min: 0, max: 5, step: 0.1, default: 1 },
       { key: 'maskBrightness', label: 'Mask Brightness', type: 'number', min: -1, max: 1, step: 0.05, default: 0 },
       // Pattern adjustments
-      { key: 'patternContrast', label: 'Pattern Contrast', type: 'number', min: 0, max: 5, step: 0.1, default: 1, showIf: (p) => ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type) },
-      { key: 'patternBrightness', label: 'Pattern Brightness', type: 'number', min: -1, max: 1, step: 0.05, default: 0, showIf: (p) => ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'].includes(p.type) },
+      { key: 'patternContrast', label: 'Pattern Contrast', type: 'number', min: 0, max: 5, step: 0.1, default: 1, showIf: (p) => ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'].includes(p.type) },
+      { key: 'patternBrightness', label: 'Pattern Brightness', type: 'number', min: -1, max: 1, step: 0.05, default: 0, showIf: (p) => ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'].includes(p.type) },
     ],
   },
   'duplicate': {

@@ -21,9 +21,10 @@ const MASK_TYPES = [
   'turbulence',
   'marble',
   'cells',
+  'cubes',
 ];
 
-const PATTERN_TYPES = ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise'];
+const PATTERN_TYPES = ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'];
 
 interface MaskEditorProps {
   step: PipelineStep;

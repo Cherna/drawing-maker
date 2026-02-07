@@ -169,23 +169,64 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
       })}
 
       {/* Warp Preview */}
-      {step.tool === 'warp' && ['simplex', 'perlin', 'turbulence', 'marble', 'cells'].includes(step.params.type) && (
+      {/* Warp Preview */}
+      {step.tool === 'warp' && (
         <div className="pt-2">
           <Label className="text-xs mb-1 block text-muted-foreground">Pattern Preview</Label>
           <MaskPreview
-            mask={{
-              type: step.params.type,
-              params: {
-                scale: step.params.frequency || step.params.scale || 0.05,
-                octaves: step.params.octaves,
-                persistence: step.params.persistence,
-                lacunarity: step.params.lacunarity,
-                distortion: step.params.distortion,
-                seed: step.params.seed,
-              },
-              contrast: step.params.patternContrast,
-              brightness: step.params.patternBrightness,
-            }}
+            mask={(() => {
+              const type = step.params.type;
+
+              // Noise & Pattern types
+              if (['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'].includes(type)) {
+                return {
+                  type: type === 'noise' ? 'simplex' : type,
+                  params: {
+                    scale: step.params.frequency || step.params.scale || 0.05,
+                    octaves: step.params.octaves,
+                    persistence: step.params.persistence,
+                    lacunarity: step.params.lacunarity,
+                    distortion: step.params.distortion,
+                    seed: step.params.seed,
+                    offsetX: step.params.offsetX,
+                    offsetY: step.params.offsetY,
+                    rotation: step.params.rotation,
+                    spacing: step.params.spacing,
+                    jitter: step.params.jitter,
+                    bevel: step.params.bevel,
+                  },
+                  contrast: step.params.patternContrast,
+                  brightness: step.params.patternBrightness,
+                };
+              }
+
+              // Wave type
+              if (type === 'wave') {
+                return {
+                  type: 'waves',
+                  params: {
+                    frequency: step.params.frequency || 0.05,
+                    angle: step.params.vertical ? 90 : 0,
+                    seed: step.params.seed,
+                    offsetX: step.params.offsetX,
+                    offsetY: step.params.offsetY,
+                  }
+                };
+              }
+
+              // Geometric types (Bulge, Pinch, Twist) -> Radial representation
+              if (['bulge', 'pinch', 'twist'].includes(type)) {
+                return {
+                  type: 'radial',
+                  params: {
+                    radius: 0.7, // approximate
+                    center: [0.5, 0.5]
+                  }
+                };
+              }
+
+              return { type: 'radial', params: {} }; // Fallback
+            })()}
           />
         </div>
       )}

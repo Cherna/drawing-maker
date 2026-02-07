@@ -1,6 +1,6 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "test32",
+  "outputBaseName": "test",
   "canvas": {
     "height": 297,
     "width": 420,

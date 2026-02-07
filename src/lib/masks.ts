@@ -103,6 +103,9 @@ export class Masks {
                 case 'checker':
                     fn = Masks.checker(config.params, bounds);
                     break;
+                case 'cubes':
+                    fn = Masks.cubes(config.params, bounds);
+                    break;
                 default:
                     fn = () => 1;
             }
@@ -333,5 +336,113 @@ export class Masks {
             return isWhite ? featherVal : (1 - featherVal);
         };
     }
-}
+    /**
+     * Cubes pattern mask - isometric cubes with 3 shades
+     * Params: scale (size), offsetX, offsetY
+     */
+    static cubes(params: any, bounds: Box): MaskFn {
+        const scale = (params.scale === 0) ? 0.1 : (params.scale ?? 0.1);
+        const offsetX = params.offsetX ?? 0;
+        const offsetY = params.offsetY ?? 0;
+        const jitter = params.jitter ?? 0;
+        const rotation = (params.rotation ?? 0) * Math.PI / 180;
+        const spacing = params.spacing ?? 0;
+        const bevel = params.bevel ?? false;
 
+        // Seeded RNG for jitter
+        const seed = params.seed ?? 0;
+        const rng = (x: number, y: number) => {
+            let h = Math.imul(x ^ seed, 1597334677);
+            h = Math.imul(h ^ y, 3812015801);
+            return ((h ^ h >>> 16) >>> 0) / 4294967296;
+        };
+
+        return (x, y) => {
+            // 1. Initial Offset
+            let px = (x + offsetX);
+            let py = (y + offsetY);
+
+            // 2. Rotation
+            if (rotation !== 0) {
+                const cos = Math.cos(rotation);
+                const sin = Math.sin(rotation);
+                const rx = px * cos - py * sin;
+                const ry = px * sin + py * cos;
+                px = rx;
+                py = ry;
+            }
+
+            // 3. Scale
+            px *= scale;
+            py *= scale;
+
+            // 4. Distortion (Slope/Bevel) - applied at the end
+
+            // 5. Hex Grid (Axial Coordinates)
+            // Pointy-topped
+            const sqrt3 = Math.sqrt(3);
+            const q = (sqrt3 / 3 * px - 1 / 3 * py);
+            const r = (2 / 3 * py);
+
+            // 6. Round to nearest hex
+            let hq = Math.round(q);
+            let hr = Math.round(r);
+            let hs = -hq - hr; // s = -q - r
+
+            // Cube rounding
+            const dq = Math.abs(hq - q);
+            const dr = Math.abs(hr - r);
+            const ds = Math.abs(hs - (-q - r));
+
+            if (dq > dr && dq > ds) hq = -hr - hs;
+            else if (dr > ds) hr = -hq - hs;
+
+            // 7. Calculate Grid Center (Unjittered)
+            let cx = sqrt3 * hq + sqrt3 / 2 * hr;
+            let cy = 3 / 2 * hr;
+
+            // 8. Apply Jitter
+            if (jitter > 0) {
+                const jx = (rng(hq, hr) - 0.5) * 2;
+                const jy = (rng(hr, hq) - 0.5) * 2;
+                cx += jx * jitter;
+                cy += jy * jitter;
+            }
+
+            // 9. Determine Position
+            const dx = px - cx;
+            const dy = py - cy;
+
+            // 10. Spacing & Distance
+            // Max radius approx 1.0 (corners)
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (spacing > 0) {
+                if (dist > (1 - spacing) * 0.866) {
+                    return 0.5; // Gap
+                }
+            }
+
+            // 11. Determine Face
+            const angle = Math.atan2(dy, dx);
+            const deg = angle * 180 / Math.PI;
+            const normDeg = (deg + 360) % 360;
+
+            let val = 0.5;
+            if (normDeg >= 210 && normDeg < 330) val = 1.0;      // Top
+            else if (normDeg >= 90 && normDeg < 210) val = 0.5;  // Left
+            else val = 0.0;                                      // Right
+
+            // 12. Apply Distortion (Slope/Bevel)
+            // Smooths the transition between faces by pulling values towards 0.5 (neutral) at the edges
+            if (bevel) {
+                // Normalize dist roughly (0 to 1)
+                const d = Math.min(1, dist * 1.15); // 1.15 approx 1/0.866 (apothem to corner ratio)
+                // Lerp towards 0.5
+                val = val + (0.5 - val) * d;
+            }
+
+            return val;
+        };
+    }
+}

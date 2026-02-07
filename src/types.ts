@@ -22,7 +22,8 @@ export type MaskType =
     | 'checker'     // Checkerboard pattern
     | 'marble'      // Marble noise pattern
     | 'simplex'     // Simplex noise
-    | 'perlin';     // Perlin noise
+    | 'perlin'      // Perlin noise
+    | 'cubes';      // Isometric cubes pattern
 
 // Mask combination operations
 export type MaskOp = 'multiply' | 'add' | 'subtract' | 'max' | 'min' | 'screen';

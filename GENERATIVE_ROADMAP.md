@@ -5,6 +5,7 @@ We are exploring and implementing various generative algorithms to expand the ca
 ## Implemented
 - [x] **Honeycomb** (Optimized)
 - [x] **Noise Types** (Simplex vs Perlin)
+- [x] **Cubes Warp Mask** (Isometric 3-shade pattern)
 
 ## Queue (In Progress)
 - [ ] **Flow Fields**: Using noise vectors to drive path rendering. Organic, hair-like textures. (Partially implemented, needs review)
