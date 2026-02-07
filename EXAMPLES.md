@@ -9,24 +9,17 @@ This document describes the example configuration files included with Drawing Ma
 Basic stripes with noise and clone/rotate to create moiré interference patterns.
 
 ```bash
-npm start configs/default.json
+npm run dev
+# Then open the Web UI and select 'default.json' from the Load Config dropdown
 ```
 
 ### `pipeline_demo.json`
 **Purpose:** Basic pipeline workflow  
 Shows the core workflow: generate → resample → noise → clone/rotate.
 
-```bash
-npm start configs/pipeline_demo.json
-```
-
 ### `moire_demo.json`
 **Purpose:** Moire pattern using layer system  
 Demonstrates the `layer` modifier to create interference patterns by duplicating and rotating layers.
-
-```bash
-npm start configs/moire_demo.json
-```
 
 ## Mask Examples
 
@@ -84,22 +77,13 @@ Key features demonstrated:
 
 ## Running Examples
 
-```bash
-# Basic
-npm start configs/default.json
-
-# Procedural masks
-npm start configs/noise_mask_demo.json
-
-# Spiral pattern
-npm start configs/spiral_demo.json
-
-# Advanced mask combinations
-npm start configs/combined_masks_demo.json
-
-# Moire pattern with layers
-npm start configs/moire_demo.json
-```
+1. Start the application:
+   ```bash
+   npm run dev
+   ```
+2. Open `http://localhost:5173`
+3. Use the **Load Config** dropdown in the sidebar to select any of these examples.
+4. The drawing will automatically render. You can then tweak parameters in real-time.
 
 Output files are saved to `drawings/` as both SVG and G-Code.
 

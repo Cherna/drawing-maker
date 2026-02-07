@@ -36,26 +36,16 @@ npm install
 
 ### Development
 
-Start both the backend API server and the frontend dev server:
+Start the development environment (Backend API + Frontend):
 
 ```bash
-npm run web:dev
+npm run dev
 ```
 
 This will:
-- Start the backend API server on `http://localhost:3000` (API endpoints only)
-- Start the Vite dev server on `http://localhost:5173` (React app)
-- **Access the app at `http://localhost:5173`** (Vite proxies API calls to port 3000)
-
-Or run them separately:
-
-```bash
-# Terminal 1: Backend
-npm run gui:dev
-
-# Terminal 2: Frontend
-npm run web
-```
+- Start the backend API server on `http://localhost:3000`
+- Start the Vite dev server on `http://localhost:5173`
+- **Access the app at `http://localhost:5173`**
 
 ### Production Build
 
