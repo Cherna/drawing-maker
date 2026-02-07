@@ -204,6 +204,7 @@ const GENERATORS: Record<string, GeneratorFn> = {
         return Patterns.Voronoi(bounds.width, bounds.height, {
             count: params.count,
             padding: params.padding,
+            relaxation: params.relaxation,
             seed: params.seed
         });
     }

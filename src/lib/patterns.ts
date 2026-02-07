@@ -1132,6 +1132,7 @@ export class Patterns {
         options?: {
             count?: number;
             padding?: number;
+            relaxation?: number;
             seed?: number;
         }
     ): MakerJs.IModel {
@@ -1141,10 +1142,11 @@ export class Patterns {
 
         const count = options?.count || 50;
         const padding = options?.padding || 0;
+        const relaxation = options?.relaxation || 0;
         const seed = options?.seed || 0;
 
         const rng = seededRandom(seed);
-        const points: { x: number, y: number }[] = [];
+        let points: { x: number, y: number }[] = [];
 
         // Generate random points
         for (let i = 0; i < count; i++) {
@@ -1192,49 +1194,97 @@ export class Patterns {
             return output;
         };
 
-        // Compute cells
-        for (let i = 0; i < points.length; i++) {
-            const site = points[i];
+        const computePolygons = (currentPoints: { x: number, y: number }[], applyPadding: boolean) => {
+            const polygons: [number, number][][] = [];
 
-            // Start with canvas rectangle
-            let poly: [number, number][] = [
-                [0, 0],
-                [safeWidth, 0],
-                [safeWidth, safeHeight],
-                [0, safeHeight]
-            ];
+            for (let i = 0; i < currentPoints.length; i++) {
+                const site = currentPoints[i];
 
-            // Clip against all other points
-            for (let j = 0; j < points.length; j++) {
-                if (i === j) continue;
+                // Start with canvas rectangle
+                let poly: [number, number][] = [
+                    [0, 0],
+                    [safeWidth, 0],
+                    [safeWidth, safeHeight],
+                    [0, safeHeight]
+                ];
 
-                const neighbor = points[j];
+                // Clip against all other points
+                for (let j = 0; j < currentPoints.length; j++) {
+                    if (i === j) continue;
 
-                // Normal points from Site to Neighbor
-                const dx = neighbor.x - site.x;
-                const dy = neighbor.y - site.y;
-                const len = Math.sqrt(dx * dx + dy * dy);
+                    const neighbor = currentPoints[j];
 
-                if (len < 1e-6) continue; // Coincident points
+                    // Normal points from Site to Neighbor
+                    const dx = neighbor.x - site.x;
+                    const dy = neighbor.y - site.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
 
-                const normal = { x: dx / len, y: dy / len };
+                    if (len < 1e-6) continue; // Coincident points
 
-                // Midpoint
-                let midX = site.x + dx * 0.5;
-                let midY = site.y + dy * 0.5;
+                    const normal = { x: dx / len, y: dy / len };
 
-                // Apply padding: move midpoint CLOSER to site by padding/2
-                if (padding > 0) {
-                    midX -= normal.x * (padding / 2);
-                    midY -= normal.y * (padding / 2);
+                    // Midpoint
+                    let midX = site.x + dx * 0.5;
+                    let midY = site.y + dy * 0.5;
+
+                    // Apply padding: move midpoint CLOSER to site by padding/2
+                    if (applyPadding && padding > 0) {
+                        midX -= normal.x * (padding / 2);
+                        midY -= normal.y * (padding / 2);
+                    }
+
+                    poly = clipByHalfPlane(poly, normal, { x: midX, y: midY });
+                    if (poly.length < 3) break;
                 }
-
-                poly = clipByHalfPlane(poly, normal, { x: midX, y: midY });
-                if (poly.length < 3) break;
+                polygons.push(poly);
             }
+            return polygons;
+        };
 
-            if (poly.length >= 3) {
-                model.models![`cell_${i}`] = new MakerJs.models.ConnectTheDots(true, poly);
+        // Lloyd's relaxation loop
+        for (let iter = 0; iter <= relaxation; iter++) {
+            const isLast = iter === relaxation;
+            // Only apply padding on the VERY LAST iteration to get the visual gaps.
+            // During relaxation, we want cells to pack tightly to find true centroids.
+            const polys = computePolygons(points, isLast);
+
+            if (isLast) {
+                // Generate Model
+                polys.forEach((poly, i) => {
+                    if (poly.length >= 3) {
+                        model.models![`cell_${i}`] = new MakerJs.models.ConnectTheDots(true, poly);
+                    }
+                });
+            } else {
+                // Move points to centroids
+                points = polys.map((poly, i) => {
+                    if (poly.length < 3) return points[i]; // Keep original if degenerate
+
+                    // Compute polygon centroid
+                    let signedArea = 0;
+                    let cx = 0;
+                    let cy = 0;
+                    for (let j = 0; j < poly.length; j++) {
+                        const x0 = poly[j][0];
+                        const y0 = poly[j][1];
+                        const x1 = poly[(j + 1) % poly.length][0];
+                        const y1 = poly[(j + 1) % poly.length][1];
+                        const a = x0 * y1 - x1 * y0;
+                        signedArea += a;
+                        cx += (x0 + x1) * a;
+                        cy += (y0 + y1) * a;
+                    }
+                    signedArea *= 0.5;
+                    if (Math.abs(signedArea) < 1e-6) return points[i];
+                    cx /= (6 * signedArea);
+                    cy /= (6 * signedArea);
+
+                    // Constrain to bounds (though centroid of clipped poly should be inside)
+                    cx = Math.max(0, Math.min(safeWidth, cx));
+                    cy = Math.max(0, Math.min(safeHeight, cy));
+
+                    return { x: cx, y: cy };
+                });
             }
         }
 

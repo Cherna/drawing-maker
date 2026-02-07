@@ -126,7 +126,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'stepSize', label: 'Step Size', type: 'number', min: 0.1, max: 20, step: 0.1, default: 1 },
       { key: 'noiseScale', label: 'Noise Scale', type: 'number', min: 0.0001, max: 0.1, step: 0.0001, default: 0.002 },
       { key: 'distortion', label: 'Angle Scale', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1 },
-      { key: 'noiseType', label: 'Noise Type', type: 'select', options: ['simplex', 'perlin', 'turbulence', 'marble', 'cells'], default: 'simplex' },
+      { key: 'noiseType', label: 'Noise Type', type: 'select', options: ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'curl'], default: 'simplex' },
       { key: 'octaves', label: 'Octaves', type: 'number', min: 1, max: 8, step: 1, default: 1, showIf: (p) => p.noiseType !== 'cells' },
       { key: 'persistence', label: 'Persistence', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5, showIf: (p) => p.noiseType !== 'cells' },
       { key: 'lacunarity', label: 'Lacunarity', type: 'number', min: 1, max: 4, step: 0.1, default: 2, showIf: (p) => p.noiseType !== 'cells' },
@@ -177,6 +177,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     params: [
       { key: 'count', label: 'Cell Count', type: 'number', min: 5, max: 1000, step: 5, default: 50 },
       { key: 'padding', label: 'Gap Size', type: 'number', min: 0, max: 20, step: 0.1, default: 2 },
+      { key: 'relaxation', label: 'Relaxation', type: 'number', min: 0, max: 50, step: 1, default: 0 },
       { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
     ],
   },

@@ -12,7 +12,7 @@ export function seededRandom(seed: number) {
     };
 }
 
-export type NoiseType = 'simplex' | 'perlin' | 'turbulence' | 'marble' | 'cells';
+export type NoiseType = 'simplex' | 'perlin' | 'turbulence' | 'marble' | 'cells' | 'curl';
 
 export interface NoiseParams {
     scale: number;
@@ -217,6 +217,37 @@ export class NoisePatterns {
         return t / maxVal;
     }
 
+    // Curl Noise (Divergence Free)
+    // Returns angle 0..1 (representing 0..2PI)
+    curl(x, y, params: NoiseParams): number {
+        const eps = 0.001;
+
+        // Potential function (psi)
+        // We can use Simplex or Perlin FBM as the potential
+        const psi = (x: number, y: number) => {
+            // Using FBM for richer curl patterns
+            return this.fbmGeneric(x, y, params, (nx, ny) => this.noise2D(nx, ny));
+        };
+
+        // Finite difference approximation of gradient
+        const n1 = psi(x, y + eps);
+        const n2 = psi(x, y - eps);
+        const a = (n1 - n2) / (2 * eps); // dPsi/dy
+
+        const n3 = psi(x + eps, y);
+        const n4 = psi(x - eps, y);
+        const b = (n3 - n4) / (2 * eps); // dPsi/dx
+
+        // Vector field v = (dPsi/dy, -dPsi/dx) = (a, -b)
+        const vx = a;
+        const vy = -b;
+
+        // Return angle normalized to 0..1
+        // atan2 is -PI to PI
+        const angle = Math.atan2(vy, vx);
+        return (angle + Math.PI) / (2 * Math.PI);
+    }
+
     // General access
     get(type: NoiseType, x: number, y: number, params: NoiseParams, seed?: number): number {
         switch (type) {
@@ -236,6 +267,8 @@ export class NoisePatterns {
                 return this.turbulence(x, y, params);
             case 'marble':
                 return this.marble(x, y, params);
+            case 'curl':
+                return this.curl(x, y, params);
             case 'cells':
                 return this.cells(x, y, params.scale, seed ?? 0);
             default:
