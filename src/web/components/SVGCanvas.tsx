@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect, useMemo } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Scan } from 'lucide-react';
 import { Button } from './ui/button';
 import { useConfigStore } from '../store/config-store';
 
@@ -191,6 +191,14 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
     setScale(prev => Math.max(MIN_ZOOM, prev / 1.2));
   };
 
+  const handleRealSize = () => {
+    // 1mm = 96/25.4 px (CSS pixels)
+    // We assume the internal unit of the SVG is mm
+    // To display at "real physical size", we scale 1 unit (1mm) to 96/25.4 CSS pixels
+    setScale(96 / 25.4);
+    setOffset({ x: 0, y: 0 });
+  };
+
   const handleReset = () => {
     if (!viewBoxDims || containerSize.width === 0 || containerSize.height === 0) return;
 
@@ -231,6 +239,15 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
           title="Zoom Out"
         >
           <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={handleRealSize}
+          title="Real Size (1:1)"
+        >
+          <Scan className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
