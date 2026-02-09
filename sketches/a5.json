@@ -1,0 +1,112 @@
+{
+  "sketch": "pipeline",
+  "outputBaseName": "a5",
+  "canvas": {
+    "height": 148,
+    "width": 210,
+    "margin": [
+      30,
+      30,
+      30,
+      30
+    ]
+  },
+  "gcode": {
+    "feedRate": 2500,
+    "travelRate": 3500,
+    "zUp": 2,
+    "zDown": -0.5,
+    "zSafe": 40,
+    "postProcessor": "linuxcnc",
+    "invertX": false,
+    "invertY": true,
+    "optimizePaths": true,
+    "joinTolerance": 0.1,
+    "dwellTime": 0
+  },
+  "params": {
+    "seed": 6714,
+    "layers": [
+      {
+        "id": "base",
+        "name": "Base Layer",
+        "steps": [
+          {
+            "tool": "stripes",
+            "params": {
+              "lines": 80
+            }
+          },
+          {
+            "tool": "resample",
+            "params": {
+              "detail": 1
+            }
+          },
+          {
+            "tool": "warp",
+            "params": {
+              "type": "cells",
+              "strength": 15,
+              "frequency": 0.05,
+              "octaves": 1,
+              "persistence": 0.5,
+              "lacunarity": 2,
+              "distortion": 10,
+              "bevel": false,
+              "jitter": 0,
+              "spacing": 0,
+              "rotation": 0,
+              "offsetX": 0,
+              "offsetY": 0,
+              "maskContrast": 1,
+              "maskBrightness": 0,
+              "patternContrast": 1,
+              "patternBrightness": 0
+            }
+          }
+        ],
+        "visible": true,
+        "strokeWidth": 0.7,
+        "color": "#000000"
+      }
+    ],
+    "activeLayerId": "base",
+    "steps": [
+      {
+        "tool": "stripes",
+        "params": {
+          "lines": 80
+        }
+      },
+      {
+        "tool": "resample",
+        "params": {
+          "detail": 1
+        }
+      },
+      {
+        "tool": "warp",
+        "params": {
+          "type": "cells",
+          "strength": 15,
+          "frequency": 0.05,
+          "octaves": 1,
+          "persistence": 0.5,
+          "lacunarity": 2,
+          "distortion": 10,
+          "bevel": false,
+          "jitter": 0,
+          "spacing": 0,
+          "rotation": 0,
+          "offsetX": 0,
+          "offsetY": 0,
+          "maskContrast": 1,
+          "maskBrightness": 0,
+          "patternContrast": 1,
+          "patternBrightness": 0
+        }
+      }
+    ]
+  }
+}

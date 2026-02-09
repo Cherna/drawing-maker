@@ -104,3 +104,11 @@ export interface AppConfig {
     params: any; // Sketch specific parameters
     exportFormat?: 'svg' | 'gcode' | 'both';
 }
+
+export interface SketchMetadata {
+    filename: string;
+    width: number;
+    height: number;
+    sizeBytes: number;
+    modified: string; // ISO date string
+}

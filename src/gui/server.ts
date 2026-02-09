@@ -385,10 +385,33 @@ app.get('/api/sketches', async (req, res) => {
             .filter(f => f.endsWith('.json'))
             .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-        // Optional: Check for thumbnails?
-        // For now, client just blindly tries to load them
+        const sketches = files.map(filename => {
+            try {
+                const filePath = path.join(SKETCHES_DIR, filename);
+                const stats = fs.statSync(filePath);
+                const content = fs.readFileSync(filePath, 'utf8');
+                const config = JSON.parse(content);
 
-        res.json({ files });
+                return {
+                    filename,
+                    width: config.canvas?.width || 0,
+                    height: config.canvas?.height || 0,
+                    sizeBytes: stats.size,
+                    modified: stats.mtime
+                };
+            } catch (e) {
+                console.error(`Failed to parse sketch ${filename}:`, e);
+                return {
+                    filename,
+                    width: 0,
+                    height: 0,
+                    sizeBytes: 0,
+                    modified: new Date(0)
+                };
+            }
+        });
+
+        res.json({ files: sketches });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

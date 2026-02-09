@@ -1,40 +1,41 @@
 {
   "sketch": "pipeline",
-  "outputBaseName": "test",
+  "outputBaseName": "a51",
   "canvas": {
-    "height": 297,
-    "width": 420,
+    "height": 148,
+    "width": 210,
     "margin": [
-      80,
-      80,
-      80,
-      80
+      30,
+      30,
+      30,
+      30
     ]
   },
   "gcode": {
-    "feedRate": 2000,
+    "feedRate": 2500,
     "travelRate": 3500,
-    "zUp": 3,
-    "zDown": -2,
+    "zUp": 2,
+    "zDown": -0.5,
+    "zSafe": 40,
     "postProcessor": "linuxcnc",
     "invertX": false,
     "invertY": true,
     "optimizePaths": true,
     "joinTolerance": 0.1,
-    "useArcs": true,
-    "dwellTime": 20
+    "dwellTime": 0
   },
   "params": {
-    "seed": 5697,
+    "seed": 6714,
     "layers": [
       {
         "id": "base",
         "name": "Base Layer",
         "steps": [
           {
-            "tool": "stripes",
+            "tool": "concentric",
             "params": {
-              "lines": 100
+              "count": 60,
+              "checkBounds": true
             }
           },
           {
@@ -47,14 +48,22 @@
             "tool": "warp",
             "params": {
               "type": "perlin",
-              "strength": 3,
-              "frequency": 0.018,
+              "strength": 14,
+              "frequency": 0.05,
               "octaves": 1,
               "persistence": 0.5,
               "lacunarity": 2,
               "distortion": 10,
+              "bevel": false,
+              "jitter": 0,
+              "spacing": 0,
+              "rotation": 0,
               "offsetX": 0,
-              "offsetY": 0
+              "offsetY": 0,
+              "maskContrast": 1,
+              "maskBrightness": 0,
+              "patternContrast": 1,
+              "patternBrightness": 0
             }
           }
         ],
@@ -63,13 +72,14 @@
         "color": "#000000"
       },
       {
-        "id": "layer_1",
+        "id": "layer_1770582633773_466",
         "name": "Base Layer Copy",
         "steps": [
           {
-            "tool": "stripes",
+            "tool": "concentric",
             "params": {
-              "lines": 100
+              "count": 50,
+              "checkBounds": true
             }
           },
           {
@@ -82,14 +92,22 @@
             "tool": "warp",
             "params": {
               "type": "perlin",
-              "strength": 7,
-              "frequency": 0.018,
+              "strength": 12,
+              "frequency": 0.0399,
               "octaves": 1,
               "persistence": 0.5,
               "lacunarity": 2,
               "distortion": 10,
+              "bevel": false,
+              "jitter": 0,
+              "spacing": 0,
+              "rotation": 0,
               "offsetX": 0,
-              "offsetY": 0
+              "offsetY": 0,
+              "maskContrast": 1,
+              "maskBrightness": 0,
+              "patternContrast": 1,
+              "patternBrightness": 0
             }
           }
         ],
@@ -98,12 +116,13 @@
         "strokeWidth": 0.7
       }
     ],
-    "activeLayerId": "layer_1",
+    "activeLayerId": "layer_1770582633773_466",
     "steps": [
       {
-        "tool": "stripes",
+        "tool": "concentric",
         "params": {
-          "lines": 100
+          "count": 60,
+          "checkBounds": true
         }
       },
       {
@@ -116,26 +135,35 @@
         "tool": "warp",
         "params": {
           "type": "perlin",
-          "strength": 3,
-          "frequency": 0.018,
+          "strength": 14,
+          "frequency": 0.05,
           "octaves": 1,
           "persistence": 0.5,
           "lacunarity": 2,
           "distortion": 10,
+          "bevel": false,
+          "jitter": 0,
+          "spacing": 0,
+          "rotation": 0,
           "offsetX": 0,
-          "offsetY": 0
+          "offsetY": 0,
+          "maskContrast": 1,
+          "maskBrightness": 0,
+          "patternContrast": 1,
+          "patternBrightness": 0
         }
       },
       {
         "tool": "duplicate",
         "params": {
-          "id": "layer_1"
+          "id": "layer_1770582633773_466"
         }
       },
       {
-        "tool": "stripes",
+        "tool": "concentric",
         "params": {
-          "lines": 100
+          "count": 50,
+          "checkBounds": true
         }
       },
       {
@@ -148,14 +176,33 @@
         "tool": "warp",
         "params": {
           "type": "perlin",
-          "strength": 7,
-          "frequency": 0.018,
+          "strength": 12,
+          "frequency": 0.0399,
           "octaves": 1,
           "persistence": 0.5,
           "lacunarity": 2,
           "distortion": 10,
+          "bevel": false,
+          "jitter": 0,
+          "spacing": 0,
+          "rotation": 0,
           "offsetX": 0,
-          "offsetY": 0
+          "offsetY": 0,
+          "maskContrast": 1,
+          "maskBrightness": 0,
+          "patternContrast": 1,
+          "patternBrightness": 0
+        }
+      }
+    ],
+    "globalSteps": [
+      {
+        "tool": "clip",
+        "params": {
+          "top": 2,
+          "right": 2,
+          "bottom": 2,
+          "left": 2
         }
       }
     ]

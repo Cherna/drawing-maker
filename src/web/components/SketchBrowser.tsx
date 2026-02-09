@@ -5,10 +5,12 @@ import { Input } from './ui/input';
 import { Trash2, FileJson, Search, Loader2, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+import { SketchMetadata } from '../../types';
+
 interface SketchBrowserProps {
     isOpen: boolean;
     onClose: () => void;
-    sketches: string[];
+    sketches: SketchMetadata[];
     onLoad: (filename: string) => void;
     onDelete: (filename: string) => void;
     isLoading?: boolean;
@@ -34,7 +36,7 @@ export function SketchBrowser({
         if (!searchQuery) return sketches;
         const query = searchQuery.toLowerCase();
         return sketches.filter(sketch =>
-            sketch.toLowerCase().includes(query)
+            sketch.filename.toLowerCase().includes(query)
         );
     }, [sketches, searchQuery]);
 
@@ -45,11 +47,11 @@ export function SketchBrowser({
         }
     };
 
-    const handleDelete = (e: React.MouseEvent, sketch: string) => {
+    const handleDelete = (e: React.MouseEvent, filename: string) => {
         e.stopPropagation();
-        if (confirm(`Are you sure you want to delete "${sketch}"?`)) {
-            onDelete(sketch);
-            if (selectedSketch === sketch) {
+        if (confirm(`Are you sure you want to delete "${filename}"?`)) {
+            onDelete(filename);
+            if (selectedSketch === filename) {
                 setSelectedSketch(null);
             }
         }
@@ -145,22 +147,22 @@ export function SketchBrowser({
                             }}
                         >
                             {filteredSketches.map((sketch) => {
-                                const isSelected = selectedSketch === sketch;
-                                const isActive = activeSketch === sketch.replace('.json', '');
-                                const thumbnailSrc = `http://localhost:3000/api/thumbnails/${sketch.replace('.json', '.png')}?t=${refreshTrigger}`;
+                                const isSelected = selectedSketch === sketch.filename;
+                                const isActive = activeSketch === sketch.filename.replace('.json', '');
+                                const thumbnailSrc = `http://localhost:3000/api/thumbnails/${sketch.filename.replace('.json', '.png')}?t=${refreshTrigger}`;
 
                                 return (
                                     <div
-                                        key={sketch}
+                                        key={sketch.filename}
                                         className={cn(
                                             "group relative aspect-square rounded-lg border overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:border-primary/50",
                                             isSelected && "ring-2 ring-primary border-primary",
                                             isActive && !isSelected && "border-primary/50"
                                         )}
-                                        onClick={() => setSelectedSketch(sketch)}
+                                        onClick={() => setSelectedSketch(sketch.filename)}
                                         onDoubleClick={() => {
-                                            setSelectedSketch(sketch);
-                                            onLoad(sketch);
+                                            setSelectedSketch(sketch.filename);
+                                            onLoad(sketch.filename);
                                             onClose();
                                         }}
                                     >
@@ -168,7 +170,7 @@ export function SketchBrowser({
                                             {/* Thumbnail Image */}
                                             <img
                                                 src={thumbnailSrc}
-                                                alt={sketch}
+                                                alt={sketch.filename}
                                                 className="w-full h-full object-contain p-2"
                                                 onError={(e) => {
                                                     // Hide image and show placeholder on error
@@ -185,14 +187,19 @@ export function SketchBrowser({
                                         {/* Overlay Title */}
                                         <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-[2px] p-2 transition-transform translate-y-full group-hover:translate-y-0 isSelected:translate-y-0">
                                             <div className="flex items-center justify-between gap-2">
-                                                <span className="text-xs font-medium text-white truncate flex-1" title={sketch}>
-                                                    {sketch.replace('.json', '')}
-                                                </span>
+                                                <div className="flex flex-col flex-1 min-w-0">
+                                                    <span className="text-xs font-medium text-white truncate" title={sketch.filename}>
+                                                        {sketch.filename.replace('.json', '')}
+                                                    </span>
+                                                    <span className="text-[10px] text-white/70">
+                                                        {sketch.width} x {sketch.height} mm
+                                                    </span>
+                                                </div>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-6 w-6 text-white/70 hover:text-red-400 hover:bg-white/10"
-                                                    onClick={(e) => handleDelete(e, sketch)}
+                                                    onClick={(e) => handleDelete(e, sketch.filename)}
                                                 >
                                                     <Trash2 className="h-3 w-3" />
                                                 </Button>
@@ -203,14 +210,19 @@ export function SketchBrowser({
                                         {isSelected && (
                                             <div className="absolute inset-x-0 bottom-0 bg-primary/90 p-2">
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-xs font-medium text-primary-foreground truncate flex-1" title={sketch}>
-                                                        {sketch.replace('.json', '')}
-                                                    </span>
+                                                    <div className="flex flex-col flex-1 min-w-0">
+                                                        <span className="text-xs font-medium text-primary-foreground truncate" title={sketch.filename}>
+                                                            {sketch.filename.replace('.json', '')}
+                                                        </span>
+                                                        <span className="text-[10px] text-primary-foreground/70">
+                                                            {sketch.width} x {sketch.height} mm
+                                                        </span>
+                                                    </div>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-6 w-6 text-primary-foreground/70 hover:text-primary-foreground hover:bg-black/10"
-                                                        onClick={(e) => handleDelete(e, sketch)}
+                                                        onClick={(e) => handleDelete(e, sketch.filename)}
                                                     >
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>

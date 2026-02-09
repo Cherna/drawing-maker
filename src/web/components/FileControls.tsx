@@ -3,13 +3,14 @@ import { useConfigStore } from '../store/config-store';
 import { Button } from './ui/button';
 // DropdownMenu imports removed
 import { Save, FolderOpen, FilePlus, RefreshCw, Trash2 } from 'lucide-react';
+import { SketchMetadata } from '../../types';
 
 import { SketchBrowser } from './SketchBrowser';
 
 export default function FileControls() {
     const { config, setConfig, isDirty, markClean } = useConfigStore();
     const [activeFile, setActiveFile] = useState<string | null>(null);
-    const [sketches, setSketches] = useState<string[]>([]);
+    const [sketches, setSketches] = useState<SketchMetadata[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 
