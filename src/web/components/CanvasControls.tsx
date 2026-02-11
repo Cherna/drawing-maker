@@ -310,6 +310,34 @@ export function GCodeSettings() {
               Invert Y Axis
             </Label>
           </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="swap-axes"
+              checked={gcode.swapAxes || false}
+              onCheckedChange={(checked) => updateGCode({ swapAxes: checked as boolean })}
+            />
+            <Label htmlFor="swap-axes" className="text-sm font-normal cursor-pointer">
+              Swap X/Y Axes (rotate 90°)
+            </Label>
+          </div>
+
+          {/* Origin Point Selection */}
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Origin Point (0,0)</Label>
+              <span className="text-[10px] text-muted-foreground">
+                ({(gcode.originX || 0).toFixed(1)}, {(gcode.originY || 0).toFixed(1)}) mm
+              </span>
+            </div>
+            <button
+              className="w-full h-9 px-3 text-sm rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-sm transition-colors"
+              onClick={() => useConfigStore.getState().setShowOriginSelector(true)}
+              title="Select origin point for GCode"
+            >
+              Set Origin Point
+            </button>
+          </div>
+
           <div className="space-y-2 pt-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="dwell-time" className="text-sm">Dwell Time (ms)</Label>

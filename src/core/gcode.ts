@@ -392,13 +392,29 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         const lines: string[] = [...post.header];
 
         // Coordinate transformation helper
-        // First apply Y-flip to match SVG coordinate system (screen coords: Y+ down)
-        // Then optionally invert for machine compatibility
+        // Order of transformations:
+        // 1. Y-flip to match SVG coordinate system (screen coords: Y+ down)
+        // 2. Swap axes if enabled (transpose X and Y)
+        // 3. Apply invert flags for machine compatibility
         const canvasHeight = config.canvas.height;
-        const transformX = (x: number) => config.gcode.invertX ? -x : x;
-        const transformY = (y: number) => {
-            const yFlipped = canvasHeight - y;  // Same as SVG: converts Cartesian Y+ (up) to screen Y+ (down)
-            return config.gcode.invertY ? -yFlipped : yFlipped;
+
+        const transformCoords = (x: number, y: number): [number, number] => {
+            let finalX = x - (config.gcode.originX || 0);
+            let finalY = (y - (config.gcode.originY || 0));
+
+            // Y-flip from Cartesian to screen coords
+            finalY = canvasHeight - finalY;
+
+            // Apply axis swap (transpose X and Y)
+            if (config.gcode.swapAxes) {
+                [finalX, finalY] = [finalY, finalX];
+            }
+
+            // Apply invert flags
+            if (config.gcode.invertX) finalX = -finalX;
+            if (config.gcode.invertY) finalY = -finalY;
+
+            return [finalX, finalY];
         };
 
         let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
@@ -438,9 +454,10 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
                 if (points.length === 0) return;
 
                 // Travel to start point
+                const [startX, startY] = transformCoords(points[0][0], points[0][1]);
                 lines.push(post.formatTravel(
-                    transformX(points[0][0]),
-                    transformY(points[0][1]),
+                    startX,
+                    startY,
                     config.gcode.travelRate
                 ));
 
@@ -453,10 +470,8 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
 
                 // Draw through ALL points (don't skip first!)
                 for (const point of points) {
-                    lines.push(post.formatMove(
-                        transformX(point[0]),
-                        transformY(point[1])
-                    ));
+                    const [px, py] = transformCoords(point[0], point[1]);
+                    lines.push(post.formatMove(px, py));
                     lineCount++;
                 }
 
@@ -488,13 +503,29 @@ export function generateGCodeForLayers(
         const lines: string[] = [...post.header];
 
         // Coordinate transformation helper
-        // First apply Y-flip to match SVG coordinate system (screen coords: Y+ down)
-        // Then optionally invert for machine compatibility
+        // Order of transformations:
+        // 1. Y-flip to match SVG coordinate system (screen coords: Y+ down)
+        // 2. Swap axes if enabled (transpose X and Y)
+        // 3. Apply invert flags for machine compatibility
         const canvasHeight = config.canvas.height;
-        const transformX = (x: number) => config.gcode.invertX ? -x : x;
-        const transformY = (y: number) => {
-            const yFlipped = canvasHeight - y;  // Same as SVG: converts Cartesian Y+ (up) to screen Y+ (down)
-            return config.gcode.invertY ? -yFlipped : yFlipped;
+
+        const transformCoords = (x: number, y: number): [number, number] => {
+            let finalX = x - (config.gcode.originX || 0);
+            let finalY = (y - (config.gcode.originY || 0));
+
+            // Y-flip from Cartesian to screen coords
+            finalY = canvasHeight - finalY;
+
+            // Apply axis swap (transpose X and Y)
+            if (config.gcode.swapAxes) {
+                [finalX, finalY] = [finalY, finalX];
+            }
+
+            // Apply invert flags
+            if (config.gcode.invertX) finalX = -finalX;
+            if (config.gcode.invertY) finalY = -finalY;
+
+            return [finalX, finalY];
         };
 
         layerModels.forEach((model, layerId) => {
@@ -533,8 +564,9 @@ export function generateGCodeForLayers(
                     if (points.length === 0) return;
 
                     const start = points[0];
+                    const [startX, startY] = transformCoords(start[0], start[1]);
 
-                    lines.push(post.formatTravel(transformX(start[0]), transformY(start[1]), config.gcode.travelRate));
+                    lines.push(post.formatTravel(startX, startY, config.gcode.travelRate));
                     lines.push(`G1 Z${config.gcode.zDown} F${config.gcode.feedRate}`);
 
                     if (config.gcode.dwellTime && config.gcode.dwellTime > 0) {
@@ -543,7 +575,8 @@ export function generateGCodeForLayers(
 
                     // Draw through remaining points
                     for (let i = 1; i < points.length; i++) {
-                        lines.push(post.formatMove(transformX(points[i][0]), transformY(points[i][1])));
+                        const [px, py] = transformCoords(points[i][0], points[i][1]);
+                        lines.push(post.formatMove(px, py));
                     }
 
                     lines.push(post.formatSafeZ(config.gcode.zUp));

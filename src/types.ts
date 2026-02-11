@@ -90,6 +90,9 @@ export interface GCodeConfig {
     dwellTime?: number;          // Pause in ms after Z-down (default: 0)
     invertX?: boolean;           // Invert X axis (positive becomes negative)
     invertY?: boolean;           // Invert Y axis (positive becomes negative)
+    swapAxes?: boolean;          // Swap X and Y axes (transpose coordinates)
+    originX?: number;            // Origin X offset in mm
+    originY?: number;            // Origin Y offset in mm
 }
 
 export interface SketchGenerator {

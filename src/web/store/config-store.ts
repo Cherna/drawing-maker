@@ -18,6 +18,9 @@ const defaultConfig: AppConfig = {
     postProcessor: 'linuxcnc',
     invertX: false,
     invertY: true,
+    swapAxes: false,
+    originX: 0,
+    originY: 0,
     optimizePaths: true,
     joinTolerance: 0.1,
     dwellTime: 0,
@@ -45,6 +48,8 @@ const defaultConfig: AppConfig = {
 interface ConfigStore {
   config: AppConfig;
   isDirty: boolean;
+  showOriginSelector: boolean;
+  setShowOriginSelector: (show: boolean) => void;
   updateConfig: (updates: Partial<AppConfig>) => void;
   updateCanvas: (updates: Partial<AppConfig['canvas']>) => void;
   updateGCode: (updates: Partial<AppConfig['gcode']>) => void;
@@ -68,6 +73,8 @@ export const useConfigStore = create<ConfigStore>()(
     (set) => ({
       config: defaultConfig,
       isDirty: false,
+      showOriginSelector: false,
+      setShowOriginSelector: (show) => set({ showOriginSelector: show }),
       updateConfig: (updates) =>
         set((state) => ({
           config: { ...state.config, ...updates },

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useLayoutEffect, useMemo } fr
 import { ZoomIn, ZoomOut, RotateCcw, Scan } from 'lucide-react';
 import { Button } from './ui/button';
 import { useConfigStore } from '../store/config-store';
+import { OriginSelector } from './OriginSelector';
 
 interface SVGCanvasProps {
   svg?: string;
@@ -10,6 +11,10 @@ interface SVGCanvasProps {
 
 export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
   const gcode = useConfigStore((state) => state.config.gcode);
+  const canvas = useConfigStore((state) => state.config.canvas);
+  const updateGCode = useConfigStore((state) => state.updateGCode);
+  const showOriginSelector = useConfigStore((state) => state.showOriginSelector);
+  const setShowOriginSelector = useConfigStore((state) => state.setShowOriginSelector);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -283,44 +288,105 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
             <g transform="translate(50, 50)">
               <circle cx="0" cy="0" r="2.5" fill="currentColor" className="text-muted-foreground/50" />
 
-              {/* X Axis (Red) */}
-              <line
-                x1="0" y1="0"
-                x2={gcode.invertX ? -22 : 22} y2="0"
-                stroke="#ef4444"
-                strokeWidth="3"
-                strokeLinecap="round"
-                markerEnd="url(#arrow-red)"
-              />
-              <text
-                x={gcode.invertX ? -32 : 32}
-                y="4"
-                fontSize="11"
-                fill="#ef4444"
-                fontWeight="bold"
-                textAnchor="middle"
-              >X</text>
+              {/* When swapAxes is enabled, X becomes vertical and Y becomes horizontal */}
+              {!gcode.swapAxes ? (
+                <>
+                  {/* X Axis (Red) - Horizontal */}
+                  <line
+                    x1="0" y1="0"
+                    x2={gcode.invertX ? -22 : 22} y2="0"
+                    stroke="#ef4444"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    markerEnd="url(#arrow-red)"
+                  />
+                  <text
+                    x={gcode.invertX ? -32 : 32}
+                    y="4"
+                    fontSize="11"
+                    fill="#ef4444"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >X</text>
 
-              {/* Y Axis (Green) */}
-              <line
-                x1="0" y1="0"
-                x2="0" y2={gcode.invertY ? -22 : 22}
-                stroke="#22c55e"
-                strokeWidth="3"
-                strokeLinecap="round"
-                markerEnd="url(#arrow-green)"
-              />
-              <text
-                x="0"
-                y={gcode.invertY ? -32 : 40}
-                fontSize="11"
-                fill="#22c55e"
-                fontWeight="bold"
-                textAnchor="middle"
-              >Y</text>
+                  {/* Y Axis (Green) - Vertical */}
+                  <line
+                    x1="0" y1="0"
+                    x2="0" y2={gcode.invertY ? -22 : 22}
+                    stroke="#22c55e"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    markerEnd="url(#arrow-green)"
+                  />
+                  <text
+                    x="0"
+                    y={gcode.invertY ? -32 : 40}
+                    fontSize="11"
+                    fill="#22c55e"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >Y</text>
+                </>
+              ) : (
+                <>
+                  {/* X Axis (Red) - Vertical (swapped from Y position) */}
+                  <line
+                    x1="0" y1="0"
+                    x2="0" y2={gcode.invertX ? -22 : 22}
+                    stroke="#ef4444"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    markerEnd="url(#arrow-red)"
+                  />
+                  <text
+                    x="0"
+                    y={gcode.invertX ? -32 : 40}
+                    fontSize="11"
+                    fill="#ef4444"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >X</text>
+
+                  {/* Y Axis (Green) - Horizontal (swapped from X position) */}
+                  <line
+                    x1="0" y1="0"
+                    x2={gcode.invertY ? -22 : 22} y2="0"
+                    stroke="#22c55e"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    markerEnd="url(#arrow-green)"
+                  />
+                  <text
+                    x={gcode.invertY ? -32 : 32}
+                    y="4"
+                    fontSize="11"
+                    fill="#22c55e"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >Y</text>
+                </>
+              )}
             </g>
           </svg>
           <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] font-mono tracking-wider text-muted-foreground uppercase opacity-40">Origin</div>
+        </div>
+      )}
+
+      {/* Persistent Origin Indicator - shows when origin is not at (0,0) */}
+      {(gcode.originX !== 0 || gcode.originY !== 0) && (
+        <div
+          className="absolute top-16 left-4 bg-card/90 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 shadow-lg flex items-center gap-2 z-30 cursor-pointer hover:bg-card transition-colors"
+          onClick={() => updateGCode({ originX: 0, originY: 0 })}
+          title="Click to reset origin to (0,0)"
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+          <div className="text-[10px] font-mono">
+            <span className="text-muted-foreground">Origin:</span>
+            <span className="ml-1 text-foreground font-semibold">
+              ({(gcode.originX || 0).toFixed(1)}, {(gcode.originY || 0).toFixed(1)})
+            </span>
+            <span className="ml-0.5 text-muted-foreground">mm</span>
+          </div>
         </div>
       )}
 
@@ -345,6 +411,16 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
           <div dangerouslySetInnerHTML={{ __html: normalizedSvg || '' }} />
         </div>
       </div>
+
+      {/* Origin Selector Overlay */}
+      {showOriginSelector && (
+        <OriginSelector
+          canvasWidth={canvas.width}
+          canvasHeight={canvas.height}
+          contentRef={contentRef}
+          onClose={() => setShowOriginSelector(false)}
+        />
+      )}
     </div>
   );
 }
