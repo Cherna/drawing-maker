@@ -406,7 +406,7 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
 
             // Step 2: Apply origin offset (both now in Cartesian space)
             finalX = finalX - (config.gcode.originX || 0);
-            finalY = finalY - (config.gcode.originY || 0);
+            finalY = finalY - (config.gcode.originY ?? canvasHeight);
 
             // Step 3: Negate Y to match CNC convention
             // (drawing extends downward/rightward from origin in machine space)
@@ -524,7 +524,7 @@ export function generateGCodeForLayers(
 
             // Step 2: Apply origin offset (both now in Cartesian space)
             finalX = finalX - (config.gcode.originX || 0);
-            finalY = finalY - (config.gcode.originY || 0);
+            finalY = finalY - (config.gcode.originY ?? canvasHeight);
 
             // Step 3: Negate Y to match CNC convention
             // (drawing extends downward/rightward from origin in machine space)

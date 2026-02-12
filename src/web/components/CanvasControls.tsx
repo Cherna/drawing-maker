@@ -178,6 +178,7 @@ import ScrubbableInput from './ui/scrubbable-input';
 
 export function GCodeSettings() {
   const gcode = useConfigStore((state) => state.config.gcode);
+  const canvas = useConfigStore((state) => state.config.canvas);
   const updateGCode = useConfigStore((state) => state.updateGCode);
   const showOriginDot = useConfigStore((state) => state.showOriginDot);
   const setShowOriginDot = useConfigStore((state) => state.setShowOriginDot);
@@ -328,7 +329,7 @@ export function GCodeSettings() {
             <div className="flex items-center justify-between">
               <Label className="text-sm">Origin Point (0,0)</Label>
               <span className="text-[10px] text-muted-foreground">
-                ({(gcode.originX || 0).toFixed(1)}, {(gcode.originY || 0).toFixed(1)}) mm
+                ({(gcode.originX || 0).toFixed(1)}, {(gcode.originY ?? canvas.height).toFixed(1)}) mm
               </span>
             </div>
             <button

@@ -23,7 +23,7 @@ export function OriginSelector({ canvasWidth, canvasHeight, contentRef, onClose 
     const updateGCode = useConfigStore((state) => state.updateGCode);
     const currentOrigin = useConfigStore((state) => ({
         x: state.config.gcode.originX || 0,
-        y: state.config.gcode.originY || 0
+        y: state.config.gcode.originY ?? state.config.canvas.height
     }));
 
     const [renderedPoints, setRenderedPoints] = useState<RenderedPoint[]>([]);

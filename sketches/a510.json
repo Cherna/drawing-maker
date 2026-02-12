@@ -21,11 +21,11 @@
     "invertX": false,
     "invertY": false,
     "optimizePaths": true,
-    "joinTolerance": 0.1,
+    "joinTolerance": 1,
     "dwellTime": 0,
     "swapAxes": true,
-    "originX": 0,
-    "originY": 0
+    "originX": 148,
+    "originY": 210
   },
   "params": {
     "seed": 6244,

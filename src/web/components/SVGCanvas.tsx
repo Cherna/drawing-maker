@@ -396,7 +396,7 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
           <div dangerouslySetInnerHTML={{ __html: normalizedSvg || '' }} />
 
           {/* Origin Indicator Dot */}
-          {showOriginDot && (gcode.originX !== 0 || gcode.originY !== 0) && viewBoxDims && (
+          {showOriginDot && (gcode.originX !== 0 || gcode.originY !== canvas.height) && viewBoxDims && (
             <svg
               width={viewBoxDims.width}
               height={viewBoxDims.height}
@@ -413,7 +413,7 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
                 {/* Convert Cartesian origin to SVG coords */}
                 <circle
                   cx={gcode.originX || 0}
-                  cy={canvas.height - (gcode.originY || 0)}
+                  cy={canvas.height - (gcode.originY ?? canvas.height)}
                   r="3"
                   fill="#f59e0b"
                   stroke="white"
@@ -422,7 +422,7 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
                 />
                 <circle
                   cx={gcode.originX || 0}
-                  cy={canvas.height - (gcode.originY || 0)}
+                  cy={canvas.height - (gcode.originY ?? canvas.height)}
                   r="8"
                   fill="none"
                   stroke="#f59e0b"

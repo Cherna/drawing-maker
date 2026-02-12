@@ -53,12 +53,16 @@ export default function FileControls() {
             });
             const data = await res.json();
             if (data.success) {
-                setConfig(updatedConfig);
-                setActiveFile(cleanName);
+                const finalFilename = data.filename ? data.filename.replace('.json', '') : cleanName;
 
-                if (data.filename) {
-                    setActiveFile(data.filename.replace('.json', ''));
-                }
+                // Update config with the actual filename used (in case of auto-rename)
+                const finalConfig = {
+                    ...updatedConfig,
+                    outputBaseName: finalFilename
+                };
+
+                setConfig(finalConfig);
+                setActiveFile(finalFilename);
 
                 markClean();
                 refreshSketches();

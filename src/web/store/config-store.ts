@@ -20,7 +20,7 @@ const defaultConfig: AppConfig = {
     invertY: true,
     swapAxes: false,
     originX: 0,
-    originY: 0,
+    originY: undefined,  // Defaults to canvas.height (top-left corner), adjusts with canvas size
     optimizePaths: true,
     joinTolerance: 0.1,
     dwellTime: 0,
