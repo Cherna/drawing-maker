@@ -179,6 +179,8 @@ import ScrubbableInput from './ui/scrubbable-input';
 export function GCodeSettings() {
   const gcode = useConfigStore((state) => state.config.gcode);
   const updateGCode = useConfigStore((state) => state.updateGCode);
+  const showOriginDot = useConfigStore((state) => state.showOriginDot);
+  const setShowOriginDot = useConfigStore((state) => state.setShowOriginDot);
 
   return (
     <div className="space-y-4">
@@ -336,6 +338,16 @@ export function GCodeSettings() {
             >
               Set Origin Point
             </button>
+            <div className="flex items-center space-x-2 pt-1">
+              <Checkbox
+                id="show-origin-dot"
+                checked={showOriginDot}
+                onCheckedChange={(checked) => setShowOriginDot(checked as boolean)}
+              />
+              <Label htmlFor="show-origin-dot" className="text-xs font-normal cursor-pointer">
+                Show origin indicator on canvas
+              </Label>
+            </div>
           </div>
 
           <div className="space-y-2 pt-2">

@@ -15,6 +15,7 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
   const updateGCode = useConfigStore((state) => state.updateGCode);
   const showOriginSelector = useConfigStore((state) => state.showOriginSelector);
   const setShowOriginSelector = useConfigStore((state) => state.setShowOriginSelector);
+  const showOriginDot = useConfigStore((state) => state.showOriginDot);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -372,23 +373,7 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
         </div>
       )}
 
-      {/* Persistent Origin Indicator - shows when origin is not at (0,0) */}
-      {(gcode.originX !== 0 || gcode.originY !== 0) && (
-        <div
-          className="absolute top-16 left-4 bg-card/90 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 shadow-lg flex items-center gap-2 z-30 cursor-pointer hover:bg-card transition-colors"
-          onClick={() => updateGCode({ originX: 0, originY: 0 })}
-          title="Click to reset origin to (0,0)"
-        >
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
-          <div className="text-[10px] font-mono">
-            <span className="text-muted-foreground">Origin:</span>
-            <span className="ml-1 text-foreground font-semibold">
-              ({(gcode.originX || 0).toFixed(1)}, {(gcode.originY || 0).toFixed(1)})
-            </span>
-            <span className="ml-0.5 text-muted-foreground">mm</span>
-          </div>
-        </div>
-      )}
+
 
       {/* Canvas - flex centering with transform for pan/zoom */}
       <div
@@ -409,6 +394,44 @@ export default function SVGCanvas({ svg, strokeWidth = 0.4 }: SVGCanvasProps) {
           }}
         >
           <div dangerouslySetInnerHTML={{ __html: normalizedSvg || '' }} />
+
+          {/* Origin Indicator Dot */}
+          {showOriginDot && (gcode.originX !== 0 || gcode.originY !== 0) && viewBoxDims && (
+            <svg
+              width={viewBoxDims.width}
+              height={viewBoxDims.height}
+              viewBox={`0 0 ${viewBoxDims.width} ${viewBoxDims.height}`}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                pointerEvents: 'none'
+              }}
+            >
+              {/* Origin dot in SVG coordinates (Y+ is down) */}
+              <g>
+                {/* Convert Cartesian origin to SVG coords */}
+                <circle
+                  cx={gcode.originX || 0}
+                  cy={canvas.height - (gcode.originY || 0)}
+                  r="3"
+                  fill="#f59e0b"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  opacity="0.9"
+                />
+                <circle
+                  cx={gcode.originX || 0}
+                  cy={canvas.height - (gcode.originY || 0)}
+                  r="8"
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth="1"
+                  opacity="0.5"
+                />
+              </g>
+            </svg>
+          )}
         </div>
       </div>
 

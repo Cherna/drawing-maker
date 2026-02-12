@@ -23,7 +23,9 @@
     "optimizePaths": true,
     "joinTolerance": 0.1,
     "dwellTime": 0,
-    "swapAxes": true
+    "swapAxes": true,
+    "originX": 0,
+    "originY": 0
   },
   "params": {
     "seed": 6244,

@@ -399,18 +399,25 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         const canvasHeight = config.canvas.height;
 
         const transformCoords = (x: number, y: number): [number, number] => {
-            let finalX = x - (config.gcode.originX || 0);
-            let finalY = (y - (config.gcode.originY || 0));
+            // Step 1: Y-flip from SVG (Y+ down) to Cartesian (Y+ up)
+            // This converts screen coordinates to the same coordinate space as the origin
+            let finalX = x;
+            let finalY = canvasHeight - y;
 
-            // Y-flip from Cartesian to screen coords
-            finalY = canvasHeight - finalY;
+            // Step 2: Apply origin offset (both now in Cartesian space)
+            finalX = finalX - (config.gcode.originX || 0);
+            finalY = finalY - (config.gcode.originY || 0);
 
-            // Apply axis swap (transpose X and Y)
+            // Step 3: Negate Y to match CNC convention
+            // (drawing extends downward/rightward from origin in machine space)
+            finalY = -finalY;
+
+            // Step 4: Apply axis swap (transpose X and Y)
             if (config.gcode.swapAxes) {
                 [finalX, finalY] = [finalY, finalX];
             }
 
-            // Apply invert flags
+            // Step 5: Apply invert flags
             if (config.gcode.invertX) finalX = -finalX;
             if (config.gcode.invertY) finalY = -finalY;
 
@@ -510,18 +517,25 @@ export function generateGCodeForLayers(
         const canvasHeight = config.canvas.height;
 
         const transformCoords = (x: number, y: number): [number, number] => {
-            let finalX = x - (config.gcode.originX || 0);
-            let finalY = (y - (config.gcode.originY || 0));
+            // Step 1: Y-flip from SVG (Y+ down) to Cartesian (Y+ up)
+            // This converts screen coordinates to the same coordinate space as the origin
+            let finalX = x;
+            let finalY = canvasHeight - y;
 
-            // Y-flip from Cartesian to screen coords
-            finalY = canvasHeight - finalY;
+            // Step 2: Apply origin offset (both now in Cartesian space)
+            finalX = finalX - (config.gcode.originX || 0);
+            finalY = finalY - (config.gcode.originY || 0);
 
-            // Apply axis swap (transpose X and Y)
+            // Step 3: Negate Y to match CNC convention
+            // (drawing extends downward/rightward from origin in machine space)
+            finalY = -finalY;
+
+            // Step 4: Apply axis swap (transpose X and Y)
             if (config.gcode.swapAxes) {
                 [finalX, finalY] = [finalY, finalX];
             }
 
-            // Apply invert flags
+            // Step 5: Apply invert flags
             if (config.gcode.invertX) finalX = -finalX;
             if (config.gcode.invertY) finalY = -finalY;
 

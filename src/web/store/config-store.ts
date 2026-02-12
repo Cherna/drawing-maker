@@ -49,7 +49,9 @@ interface ConfigStore {
   config: AppConfig;
   isDirty: boolean;
   showOriginSelector: boolean;
+  showOriginDot: boolean;
   setShowOriginSelector: (show: boolean) => void;
+  setShowOriginDot: (show: boolean) => void;
   updateConfig: (updates: Partial<AppConfig>) => void;
   updateCanvas: (updates: Partial<AppConfig['canvas']>) => void;
   updateGCode: (updates: Partial<AppConfig['gcode']>) => void;
@@ -74,7 +76,9 @@ export const useConfigStore = create<ConfigStore>()(
       config: defaultConfig,
       isDirty: false,
       showOriginSelector: false,
+      showOriginDot: true,
       setShowOriginSelector: (show) => set({ showOriginSelector: show }),
+      setShowOriginDot: (show) => set({ showOriginDot: show }),
       updateConfig: (updates) =>
         set((state) => ({
           config: { ...state.config, ...updates },
