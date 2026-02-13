@@ -75,7 +75,7 @@ app.post('/api/preview', async (req, res) => {
 
         if (layers && layers.length > 0) {
             // New layer-aware rendering
-            const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed);
+            const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode);
 
             // Build layer data for rendering
             const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
@@ -119,8 +119,7 @@ app.post('/api/preview', async (req, res) => {
             res.json({ svg, stats });
         } else {
             // Backward compatibility: use old pipeline for non-layered configs
-            const sketch = new PipelineSketch();
-            const model = await sketch.generate(previewConfig.canvas, previewConfig.params);
+            const model = await Pipeline.execute(previewConfig.params.steps || [], previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode);
             const svg = modelToSVG(model, previewConfig.canvas);
             const stats = getModelStats(model);
             res.json({ svg, stats });
@@ -168,7 +167,7 @@ app.post('/api/export', async (req, res) => {
         // Check if we have a layer-based configuration
         if (layers && layers.length > 0) {
             // New layer-aware export
-            const layerModels = await Pipeline.executeLayered(layers, config.canvas, config.params.seed);
+            const layerModels = await Pipeline.executeLayered(layers, config.canvas, config.params.seed, config.gcode);
 
             if (exportMode === 'individual') {
                 // Export each layer separately
@@ -250,8 +249,7 @@ app.post('/api/export', async (req, res) => {
             }
         } else {
             // Backward compatibility: use old pipeline for non-layered configs
-            const sketch = new PipelineSketch();
-            const model = await sketch.generate(config.canvas, config.params);
+            const model = await Pipeline.execute(config.params.steps || [], config.canvas, config.params.seed, config.gcode);
             const svg = modelToSVG(model, config.canvas);
             const gcode = generateGCode(model, config, config.gcode.postProcessor || 'standard');
 
@@ -283,7 +281,7 @@ async function generateThumbnail(config: AppConfig): Promise<Buffer> {
     const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
 
     if (layers && layers.length > 0) {
-        const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed);
+        const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode);
 
         for (const layer of layers) {
             if (!layer.visible) continue;
@@ -314,8 +312,7 @@ async function generateThumbnail(config: AppConfig): Promise<Buffer> {
             }
         }
     } else {
-        const sketch = new PipelineSketch();
-        const model = await sketch.generate(previewConfig.canvas, previewConfig.params);
+        const model = await Pipeline.execute(previewConfig.params.steps || [], previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode);
         finalModel = model;
         layerData.set('default', { model, color: '#000000' });
     }
@@ -538,14 +535,13 @@ app.post('/api/export-animated', async (req, res) => {
         let model: MakerJs.IModel;
 
         if (layers && layers.length > 0) {
-            const layerModels = await Pipeline.executeLayered(layers, config.canvas, config.params.seed);
+            const layerModels = await Pipeline.executeLayered(layers, config.canvas, config.params.seed, config.gcode);
             model = { models: {} };
             for (const [id, layerModel] of layerModels) {
                 model.models![id] = layerModel;
             }
         } else {
-            const sketch = new PipelineSketch();
-            model = await sketch.generate(config.canvas, config.params);
+            model = await Pipeline.execute(config.params.steps || [], config.canvas, config.params.seed, config.gcode);
         }
 
         const animatedSvg = modelToAnimatedSVG(model, config.canvas, {

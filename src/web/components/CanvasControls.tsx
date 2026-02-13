@@ -252,6 +252,49 @@ export function GCodeSettings() {
           />
         </div>
 
+        {/* Solid Filling */}
+        <div className="col-span-2 space-y-3 pt-4 border-t border-border">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="enable-filling"
+              checked={gcode.enableFilling || false}
+              onCheckedChange={(checked) => updateGCode({ enableFilling: checked as boolean })}
+            />
+            <Label htmlFor="enable-filling" className="text-sm font-semibold cursor-pointer">
+              Enable Solid Filling
+            </Label>
+          </div>
+
+          {gcode.enableFilling && (
+            <div className="grid grid-cols-2 gap-4 pl-6">
+              <div className="space-y-2">
+                <Label htmlFor="fill-angle">Fill Angle (deg)</Label>
+                <div className="flex items-center gap-2">
+                  <ScrubbableInput
+                    id="fill-angle"
+                    min={0}
+                    max={180}
+                    step={1}
+                    value={gcode.fillAngle ?? 0}
+                    onChange={(val) => updateGCode({ fillAngle: val ?? 0 })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fill-spacing">Spacing (mm)</Label>
+                <ScrubbableInput
+                  id="fill-spacing"
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  value={gcode.fillSpacing ?? 0.5}
+                  onChange={(val) => updateGCode({ fillSpacing: val ?? 0.5 })}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Optimization Toggles */}
         <div className="col-span-2 space-y-3 pt-4 border-t border-border">
           <div className="flex items-center space-x-2">

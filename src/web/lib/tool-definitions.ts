@@ -41,6 +41,8 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'lines', label: 'Lines (X&Y)', type: 'number', min: 1, max: 200, step: 1, default: 20 },
       { key: 'linesX', label: 'Lines X', type: 'number', min: 1, max: 200, step: 1 },
       { key: 'linesY', label: 'Lines Y', type: 'number', min: 1, max: 200, step: 1 },
+      { key: 'fillChance', label: 'Fill Chance', type: 'number', min: 0, max: 1, step: 0.05, default: 0 },
+      { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
     ],
   },
   'spiral': {

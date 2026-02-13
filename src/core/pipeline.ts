@@ -5,6 +5,8 @@ import { Effects } from '../lib/effects';
 import { Layout, Box } from '../lib/layout';
 import { Masks } from '../lib/masks';
 import { NoisePatterns, NoiseParams } from '../lib/noise-patterns';
+import { Filling } from '../lib/filling';
+import { GCodeConfig } from '../types';
 
 type GeneratorFn = (params: any, ctx: CanvasConfig, bounds: Box) => MakerJs.IModel | Promise<MakerJs.IModel>;
 type ModifierFn = (model: MakerJs.IModel, params: any, ctx: CanvasConfig, bounds: Box, mask?: (x: number, y: number) => number) => Promise<MakerJs.IModel | void> | MakerJs.IModel | void;
@@ -66,7 +68,10 @@ const GENERATORS: Record<string, GeneratorFn> = {
     'grid': (params, ctx, bounds) => {
         const countX = params.linesX || params.lines || 20;
         const countY = params.linesY || params.lines || 20;
-        return Patterns.Grid(countX, countY, bounds.width, bounds.height);
+        return Patterns.Grid(countX, countY, bounds.width, bounds.height, {
+            fillChance: params.fillChance,
+            seed: params.seed
+        });
     },
 
     'concentric': (params, ctx, bounds) => {
@@ -661,7 +666,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
 
 // ==================== PIPELINE EXECUTOR ====================
 export class Pipeline {
-    static async execute(steps: PipelineStep[], ctx: CanvasConfig, globalSeed?: number): Promise<MakerJs.IModel> {
+    static async execute(steps: PipelineStep[], ctx: CanvasConfig, globalSeed?: number, gcode?: GCodeConfig): Promise<MakerJs.IModel> {
         let currentModel: MakerJs.IModel | null = null;
         const bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
         const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
@@ -760,6 +765,16 @@ export class Pipeline {
                     drawCenterY - modelCenterY
                 ]);
             }
+
+            // Apply solid filling if enabled
+            if (gcode && gcode.enableFilling) {
+                console.log('Pipeline: Applying solid filling...');
+                Filling.applyFilling(currentModel, {
+                    angle: gcode.fillAngle ?? 0,
+                    spacing: gcode.fillSpacing ?? 0.5
+                });
+            }
+
             return currentModel;
         }
 
@@ -776,7 +791,7 @@ export class Pipeline {
      * @param globalSeed Optional global seed for reproducibility
      * @returns Map of layer IDs to their processed models
      */
-    static async executeLayered(layers: Layer[], ctx: CanvasConfig, globalSeed?: number): Promise<Map<string, MakerJs.IModel>> {
+    static async executeLayered(layers: Layer[], ctx: CanvasConfig, globalSeed?: number, gcode?: GCodeConfig): Promise<Map<string, MakerJs.IModel>> {
         const result = new Map<string, MakerJs.IModel>();
         const bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
         const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
@@ -868,6 +883,37 @@ export class Pipeline {
 
                     const afterExtents = MakerJs.measure.modelExtents(currentModel);
 
+                }
+
+                if (currentModel) {
+                    const fillParams = {
+                        angle: gcode?.fillAngle ?? 0,
+                        spacing: gcode?.fillSpacing ?? 0.5
+                    };
+
+                    if (gcode?.enableFilling) {
+                        // Global filling enabled: Fill everything (recursive)
+                        console.log(`Pipeline: Global filling enabled for layer '${layer.name}'`);
+                        Filling.applyFilling(currentModel, fillParams);
+                    } else {
+                        // Global filling disabled: Only fill models explicitly marked as 'filled'
+                        console.log(`Pipeline: Global filling disabled, checking for 'filled' content in layer '${layer.name}'`);
+
+                        // Helper to find and fill marked models
+                        const fillMarkedModels = (m: MakerJs.IModel) => {
+                            if (m.layer === 'filled') {
+                                console.log(`Pipeline: Found marked content, applying filling...`);
+                                Filling.applyFilling(m, fillParams);
+                                // Don't recurse into already filled model
+                                return;
+                            }
+                            if (m.models) {
+                                for (const key in m.models) fillMarkedModels(m.models[key]);
+                            }
+                        };
+
+                        fillMarkedModels(currentModel);
+                    }
                 }
 
                 result.set(layer.id, currentModel);

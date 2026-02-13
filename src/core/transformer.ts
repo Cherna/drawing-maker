@@ -8,15 +8,37 @@ export class Transformer {
      */
     static resample(model: MakerJs.IModel, resolution: number): MakerJs.IModel {
         const result: MakerJs.IModel = { models: {} };
+        const pointCache = new Map<MakerJs.IPoint, MakerJs.IPoint>();
+        // coordCache removed - it causes issues with nested models sharing local coordinates
+
+        const getCachedPoint = (p: MakerJs.IPoint): MakerJs.IPoint | null => {
+            if (pointCache.has(p)) return pointCache.get(p)!;
+            return null;
+        };
+
+        const cachePoint = (original: MakerJs.IPoint, created: MakerJs.IPoint) => {
+            pointCache.set(original, created);
+        };
 
         const processPath = (path: MakerJs.IPath): MakerJs.IModel => {
             const len = MakerJs.measure.pathLength(path);
             const divisions = Math.max(1, Math.ceil(len / resolution));
             const segmentModel: MakerJs.IModel = { paths: {} };
 
-            // Start point - circles need special handling
+            // Resolve start point
             let prev: MakerJs.IPoint;
-            let firstPoint: MakerJs.IPoint; // Keep ref to first point for closure
+            let firstPoint: MakerJs.IPoint;
+
+            // Get original ends to check cache
+            // Note: fromPathEnds returns [origin, end] for line/arc
+            const originalEnds = MakerJs.point.fromPathEnds(path);
+            let cachedStart: MakerJs.IPoint | null = null;
+            let cachedEnd: MakerJs.IPoint | null = null;
+
+            if (originalEnds) {
+                cachedStart = getCachedPoint(originalEnds[0]);
+                cachedEnd = getCachedPoint(originalEnds[1]);
+            }
 
             if (path.type === 'circle' || path.type === 'arc') {
                 const arc = path as MakerJs.IPathArc;
@@ -25,14 +47,22 @@ export class Transformer {
                 // FIX: Convert to radians for fromPolar
                 const startRad = startAngle * Math.PI / 180;
                 const polar = MakerJs.point.fromPolar(startRad, arc.radius);
-                prev = MakerJs.point.add(polar, arc.origin!);
-            } else {
-                const ends = MakerJs.point.fromPathEnds(path);
-                if (!ends) {
-                    console.warn(`Transformer.resample: Cannot get path ends for path type '${path.type}'`);
-                    return { paths: {} };
+
+                // For arcs, origin is center. pathEnds keys off calculated points (start/end on arc).
+                if (cachedStart) {
+                    prev = cachedStart;
+                } else {
+                    prev = MakerJs.point.add(polar, arc.origin!);
+                    if (originalEnds) cachePoint(originalEnds[0], prev);
                 }
-                prev = ends[0];
+            } else {
+                // Line
+                if (cachedStart) {
+                    prev = cachedStart;
+                } else {
+                    prev = originalEnds ? [originalEnds[0][0], originalEnds[0][1]] : [0, 0];
+                    if (originalEnds) cachePoint(originalEnds[0], prev);
+                }
             }
             firstPoint = prev;
 
@@ -48,39 +78,56 @@ export class Transformer {
                     isClosed = true;
                 }
             }
-            // Lines are generally not closed in this context (single path)
 
             for (let i = 1; i <= divisions; i++) {
                 let curr: MakerJs.IPoint;
 
-                // If this is the last segment and it's a closed loop, reuse the first point object
-                // This ensures exact object identity for the loop closure, which fixes warp gaps
-                if (i === divisions && isClosed) {
-                    curr = firstPoint;
+                if (i === divisions) {
+                    // Last point
+                    if (isClosed) {
+                        curr = firstPoint;
+                    } else {
+                        // Use cached end if available
+                        if (cachedEnd) {
+                            curr = cachedEnd;
+                        } else {
+                            // Calculate end
+                            if (path.type === 'line') {
+                                const line = path as MakerJs.IPathLine;
+                                curr = [line.end[0], line.end[1]];
+                            } else if (path.type === 'arc' || path.type === 'circle') {
+                                // Arcs end calculation
+                                const arc = path as MakerJs.IPathArc;
+                                const endAngle = arc.endAngle || 360;
+                                const endRad = endAngle * Math.PI / 180;
+                                const polar = MakerJs.point.fromPolar(endRad, arc.radius);
+                                curr = MakerJs.point.add(polar, arc.origin!);
+                            } else {
+                                const ends = MakerJs.point.fromPathEnds(path);
+                                curr = ends ? ends[1] : [0, 0];
+                            }
+                            if (originalEnds) cachePoint(originalEnds[1], curr);
+                        }
+                    }
                 } else {
+                    // Intermediate points
                     const t = i / divisions;
-
                     if (path.type === 'line') {
                         const line = path as MakerJs.IPathLine;
-                        const start = line.origin;
-                        const end = line.end;
                         curr = [
-                            start[0] + (end[0] - start[0]) * t,
-                            start[1] + (end[1] - start[1]) * t
+                            line.origin[0] + (line.end[0] - line.origin[0]) * t,
+                            line.origin[1] + (line.end[1] - line.origin[1]) * t
                         ];
                     } else if (path.type === 'arc' || path.type === 'circle') {
                         const arc = path as MakerJs.IPathArc;
-                        // Circles might not have startAngle set, default to 0 (full circle)
                         const startAngle = arc.startAngle !== undefined ? arc.startAngle : 0;
                         const endAngle = arc.endAngle !== undefined ? arc.endAngle : 360;
                         const totalAngle = endAngle - startAngle;
                         const currentAngle = startAngle + totalAngle * t;
-                        // MakerJs.point.fromPolar expects RADIANS, but Arcs use DEGREES
                         const currRad = currentAngle * Math.PI / 180;
                         const polar = MakerJs.point.fromPolar(currRad, arc.radius);
                         curr = MakerJs.point.add(polar, arc.origin!);
                     } else {
-                        // Fallback
                         const ends = MakerJs.point.fromPathEnds(path);
                         curr = ends ? ends[1] : [0, 0];
                     }
@@ -94,19 +141,35 @@ export class Transformer {
         };
 
         const traverse = (m: MakerJs.IModel, target: MakerJs.IModel) => {
-            if (m.paths) {
-                target.models = target.models || {};
-                const keys = Object.keys(m.paths).sort();
-                for (const id of keys) {
-                    target.models[`resample_${id}`] = processPath(m.paths[id]);
-                }
-            }
+            // Process models FIRST before paths to maintain hierarchy
             if (m.models) {
                 target.models = target.models || {};
                 const keys = Object.keys(m.models).sort();
                 for (const id of keys) {
+                    const sourceModel = m.models[id];
                     target.models[id] = {};
-                    traverse(m.models[id], target.models[id]!);
+
+                    // Preserve properties
+                    if (sourceModel.origin) target.models[id].origin = [sourceModel.origin[0], sourceModel.origin[1]];
+                    if (sourceModel.type) target.models[id].type = sourceModel.type;
+                    if (sourceModel.layer) target.models[id].layer = sourceModel.layer;
+                    if (sourceModel.units) target.models[id].units = sourceModel.units;
+
+                    traverse(sourceModel, target.models[id]!);
+                }
+            }
+
+            // Process paths at this level only
+            if (m.paths) {
+                target.paths = target.paths || {};
+                const keys = Object.keys(m.paths).sort();
+                for (const id of keys) {
+                    const segments = processPath(m.paths[id]);
+                    if (segments.paths) {
+                        for (const segId in segments.paths) {
+                            target.paths[`${id}_${segId}`] = segments.paths[segId];
+                        }
+                    }
                 }
             }
         };

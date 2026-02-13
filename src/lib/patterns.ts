@@ -35,21 +35,63 @@ export class Patterns {
     /**
      * Grid pattern - horizontal and vertical lines
      */
-    static Grid(countX: number, countY: number, width: number, height: number): MakerJs.IModel {
-        const model: MakerJs.IModel = { paths: {} };
+    static Grid(
+        countX: number,
+        countY: number,
+        width: number,
+        height: number,
+        options?: { fillChance?: number, seed?: number }
+    ): MakerJs.IModel {
+        const model: MakerJs.IModel = { paths: {}, models: {} };
         const stepX = width / countX;
         const stepY = height / countY;
 
         // Horizontal lines
         for (let i = 0; i <= countY; i++) {
             const y = i * stepY;
-            model.paths![`h_${i}`] = new MakerJs.paths.Line([0, y], [width, y]);
+            // Shorten slightly to prevent loop detection of the grid border
+            model.paths![`h_${i}`] = new MakerJs.paths.Line([0.01, y], [width - 0.01, y]);
         }
 
         // Vertical lines
         for (let i = 0; i <= countX; i++) {
             const x = i * stepX;
-            model.paths![`v_${i}`] = new MakerJs.paths.Line([x, 0], [x, height]);
+            // Shorten slightly to prevent loop detection of the grid border
+            model.paths![`v_${i}`] = new MakerJs.paths.Line([x, 0.01], [x, height - 0.01]);
+        }
+
+        // Randomly fill cells
+        const chance = options?.fillChance ?? 0;
+        const seed = options?.seed ?? 0;
+
+        if (chance > 0) {
+            for (let i = 0; i < countX; i++) {
+                for (let j = 0; j < countY; j++) {
+                    // Unique seed per cell based on global seed
+                    // Simple hash or just adding numbers (seededRandom usually takes a number)
+                    // If seededRandom takes a number, let's use a unique index
+                    const cellSeed = seed + (i * countY + j);
+
+                    if (seededRandom(cellSeed)() < chance) {
+                        const x = i * stepX;
+                        const y = j * stepY;
+
+                        // Create a rectangle slightly smaller than the cell
+                        const rect: MakerJs.IModel = new MakerJs.models.Rectangle(stepX * 0.8, stepY * 0.8);
+
+                        // Mark as filled content
+                        rect.layer = 'filled';
+
+                        // Move to center of cell
+                        const cx = x + stepX / 2;
+                        const cy = y + stepY / 2;
+                        MakerJs.model.center(rect);
+                        MakerJs.model.move(rect, [cx, cy]);
+
+                        model.models![`rect_${i}_${j}`] = rect;
+                    }
+                }
+            }
         }
 
         return model;

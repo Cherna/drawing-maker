@@ -82,3 +82,13 @@ This document defines the standard operating procedures (Skills) for working in 
 2.  **Summarization**: When tasks complete, summarize findings in `walkthrough.md` or `task.md` to offload mental context.
 3.  **Cleanup**: Delete temporary files or irrelevant artifacts to keep the workspace clean.
 
+## Skill: Server Management
+
+**Description**: Rules for handling the development server.
+
+**Rules**:
+1.  **User Managed**: The user typically runs `npm run dev` and `npm run api` in their own terminals.
+2.  **Do Not Restart**: Do not attempt to start, stop, or restart the server process unless explicitly instructed.
+3.  **Assume Running**: Assume the server is running and accessible at `http://localhost:3000` (API) and `http://localhost:5173` (Web).
+4.  **Hot Reloading**: Changes to `src/gui/*.ts` and `src/core/*.ts` should be picked up automatically by `nodemon`. If not, ask the user to restart.
+

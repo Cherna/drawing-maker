@@ -93,6 +93,9 @@ export interface GCodeConfig {
     swapAxes?: boolean;          // Swap X and Y axes (transpose coordinates)
     originX?: number;            // Origin X offset in mm
     originY?: number;            // Origin Y offset in mm
+    enableFilling?: boolean;
+    fillAngle?: number;          // Default: 0
+    fillSpacing?: number;        // Default: 0.5mm
 }
 
 export interface SketchGenerator {

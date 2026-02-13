@@ -2,14 +2,25 @@
 
 This document matches the ideas in `BRAINSTORMING.md` with actionable phases.
 
-## Phase 1: Hybrid Workflow (Manual Tools)
+## Phase 1: Solid Areas & Filling
+Focusing on generating solid shapes and varying tone/intensity.
+- [ ] **Solid Area Generation**:
+    - [ ] Update generators to produce closed loops (solid blocks) instead of just lines.
+    - [ ] **Block Detection Algorithm**: Detect closed regions that require filling.
+- [ ] **Procedural Hatching / Filling**:
+    - [ ] Convert solid blocks into hatch lines (parallel, cross-hatching).
+    - [ ] **Intensity Modulation**:
+        - [ ] Vary hatch density to create gradients/shading.
+        - [ ] Control "darkness" via line proximity.
+
+## Phase 2: Hybrid Workflow (Manual Tools)
 Bringing the "human touch" into the generative process.
 - [ ] **Manual Masking Tool**:
     - [ ] Create a "Mask" layer type in the UI.
     - [ ] Implement a brush tool to paint black/white on the mask.
     - [ ] Integrate mask data into existing generators (e.g. use mask to control Warp amount).
 
-## Phase 2: 3D to 2D Pipeline
+## Phase 3: 3D to 2D Pipeline
 Bridging the gap between Blender and Plotter.
 - [ ] **3D Mesh Importer**:
     - [ ] Support loading OBJ/STL files.
@@ -21,7 +32,7 @@ Bridging the gap between Blender and Plotter.
     - [ ] Implement 3D-to-2D projection logic.
     - [ ] **Hidden Line Removal (HLR)** implementation (Crucial for clean vector output).
 
-## Phase 3: Enhancements & Polish
+## Phase 4: Enhancements & Polish
 Refining the output quality.
 - [ ] **Advanced Hatching**:
     - [ ] **Surface-Aware Hatching**: Use 3D normals/curvature to guide line direction (true "form" shading).
@@ -31,7 +42,7 @@ Refining the output quality.
 - [ ] **Path Optimization**:
     - [ ] Implement TSP / Path sorting (behind an OPT-IN toggle).
 
-## Phase 4: Advanced Generators (Organic)
+## Phase 5: Advanced Generators (Organic)
 New toys for creating natural forms.
 - [ ] **Differential Growth Generator**:
     - [ ] Implement node-based line expansion algorithm.
