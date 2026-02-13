@@ -19,6 +19,7 @@ export default function GlobalStepItem({ step, index }: GlobalStepItemProps) {
     const updateGlobalStep = useConfigStore((state) => state.updateGlobalStep);
     const removeGlobalStep = useConfigStore((state) => state.removeGlobalStep);
     const addGlobalStep = useConfigStore((state) => state.addGlobalStep);
+    const moveGlobalStep = useConfigStore((state) => state.moveGlobalStep);
     const globalSteps = useConfigStore((state) => state.config.params?.globalSteps || []);
 
     const toolDef = TOOL_DEFINITIONS[step.tool];
@@ -121,7 +122,26 @@ export default function GlobalStepItem({ step, index }: GlobalStepItemProps) {
                         >
                             <Copy className="h-3 w-3" />
                         </Button>
-                        {/* Move buttons omitted as store action not implemented yet */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => moveGlobalStep(index, 'up')}
+                            disabled={index === 0}
+                            title="Move up"
+                        >
+                            <ChevronUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => moveGlobalStep(index, 'down')}
+                            disabled={index === globalSteps.length - 1}
+                            title="Move down"
+                        >
+                            <ChevronDown className="h-3 w-3" />
+                        </Button>
                         <Button
                             variant="ghost"
                             size="icon"

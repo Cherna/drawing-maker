@@ -19,10 +19,13 @@
     "zSafe": 40,
     "postProcessor": "linuxcnc",
     "invertX": false,
-    "invertY": true,
+    "invertY": false,
     "optimizePaths": true,
     "joinTolerance": 0.1,
-    "dwellTime": 0
+    "dwellTime": 0,
+    "originX": 148,
+    "originY": 210,
+    "swapAxes": true
   },
   "params": {
     "seed": 6244,

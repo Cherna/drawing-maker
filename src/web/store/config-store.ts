@@ -62,6 +62,7 @@ interface ConfigStore {
   addGlobalStep: (step: PipelineStep) => void;
   updateGlobalStep: (index: number, updates: Partial<PipelineStep>) => void;
   removeGlobalStep: (index: number) => void;
+  moveGlobalStep: (index: number, direction: 'up' | 'down') => void;
 
   setConfig: (config: AppConfig) => void;
   markClean: () => void;
@@ -155,6 +156,26 @@ export const useConfigStore = create<ConfigStore>()(
         set((state) => {
           const globalSteps = state.config.params.globalSteps ? [...state.config.params.globalSteps] : [];
           globalSteps.splice(index, 1);
+          return {
+            config: {
+              ...state.config,
+              params: { ...state.config.params, globalSteps }
+            },
+            isDirty: true,
+          };
+        }),
+      moveGlobalStep: (index, direction) =>
+        set((state) => {
+          const globalSteps = state.config.params.globalSteps ? [...state.config.params.globalSteps] : [];
+          if (direction === 'up' && index > 0) {
+            const temp = globalSteps[index];
+            globalSteps[index] = globalSteps[index - 1];
+            globalSteps[index - 1] = temp;
+          } else if (direction === 'down' && index < globalSteps.length - 1) {
+            const temp = globalSteps[index];
+            globalSteps[index] = globalSteps[index + 1];
+            globalSteps[index + 1] = temp;
+          }
           return {
             config: {
               ...state.config,
