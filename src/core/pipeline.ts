@@ -668,10 +668,10 @@ export class Pipeline {
 
         for (const step of steps) {
             if (step.enabled === false) {
-                console.log(`Pipeline: Skipping muted step ${step.tool}`);
+                // console.log(`Pipeline: Skipping muted step ${step.tool}`);
                 continue;
             }
-            console.log(`Pipeline: Executing ${step.tool}...`);
+            // console.log(`Pipeline: Executing ${step.tool}...`);
 
             // Get seed for this step (from step params, or global)
             const stepSeed = step.params?.seed ?? globalSeed;
@@ -784,14 +784,14 @@ export class Pipeline {
         // Process each visible layer independently
         for (const layer of layers) {
             if (!layer.visible) {
-                console.log(`Pipeline: Skipping hidden layer '${layer.name}'`);
+                // console.log(`Pipeline: Skipping hidden layer '${layer.name}'`);
                 continue;
             }
 
-            console.log(`Pipeline: Processing layer '${layer.name}' (${layer.steps.length} steps)...`);
+            // console.log(`Pipeline: Processing layer '${layer.name}' (${layer.steps.length} steps)...`);
 
             if (layer.steps.length === 0) {
-                console.log(`Pipeline: Layer '${layer.name}' has no steps, skipping`);
+                // console.log(`Pipeline: Layer '${layer.name}' has no steps, skipping`);
                 continue;
             }
 

@@ -178,7 +178,7 @@ function consolidateContinuousPaths(chains: MakerJs.IChain[], tolerance: number)
         consolidated.push(current);
     }
 
-    console.log(`[G-Code] Consolidated ${chains.length} chains into ${consolidated.length} continuous paths (tolerance: ${tolerance}mm)`);
+    // console.log(`[G-Code] Consolidated ${chains.length} chains into ${consolidated.length} continuous paths (tolerance: ${tolerance}mm)`);
     return consolidated;
 }
 
@@ -268,7 +268,7 @@ function detectParallelLines(chains: MakerJs.IChain[]): MakerJs.IChain[][] {
 
     if (parallelGroups.length > 0) {
         const totalParallel = parallelGroups.reduce((sum, g) => sum + g.length, 0);
-        console.log(`[G-Code] Detected ${parallelGroups.length} parallel groups with ${totalParallel} total lines`);
+        // console.log(`[G-Code] Detected ${parallelGroups.length} parallel groups with ${totalParallel} total lines`);
     }
 
     return parallelGroups;
@@ -297,7 +297,7 @@ function optimizeParallelGroups(parallelGroups: MakerJs.IChain[][], allChains: M
     // Add remaining chains using nearest-neighbor
     const remaining = allChains.filter(c => !usedChains.has(c));
     if (remaining.length > 0) {
-        console.log(`[G-Code] Processing ${remaining.length} non-parallel chains with nearest-neighbor`);
+        // console.log(`[G-Code] Processing ${remaining.length} non-parallel chains with nearest-neighbor`);
         result.push(...optimizeNearestNeighbor(remaining));
     }
 
@@ -386,7 +386,7 @@ function optimizeNearestNeighbor(chains: MakerJs.IChain[]): OptimizedChain[] {
 
 export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: PostProcessorType = 'standard'): string {
     try {
-        console.log(`[G-Code] Starting export with post-processor: ${type}`);
+        // console.log(`[G-Code] Starting export with post-processor: ${type}`);
 
         const post = POST_PROCESSORS[type](config);
         const lines: string[] = [...post.header];
@@ -425,12 +425,12 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         };
 
         let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
-        console.log(`[G-Code] Found ${chains.length} path chains`);
+        // console.log(`[G-Code] Found ${chains.length} path chains`);
 
         // Optimize path order if enabled - returns metadata
         let optimizedChains: OptimizedChain[];
         if (config.gcode.optimizePaths) {
-            console.log('[G-Code] Optimizing path order...');
+            // console.log('[G-Code] Optimizing path order...');
             optimizedChains = optimizeChainOrder(chains, config.gcode.joinTolerance || 0.01);
         } else {
             optimizedChains = chains.map(chain => ({ chain, reverse: false }));
@@ -490,7 +490,7 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         });
 
         lines.push(...post.footer);
-        console.log(`[G-Code] Export complete: ${lineCount} segments`);
+        // console.log(`[G-Code] Export complete: ${lineCount} segments`);
         return lines.join('\n');
     } catch (error: any) {
         console.error('[G-Code] Export failed:', error.message);
@@ -504,7 +504,7 @@ export function generateGCodeForLayers(
     type: PostProcessorType = 'standard'
 ): string {
     try {
-        console.log(`[G-Code] Starting multi-layer export for ${layerModels.size} layers`);
+        // console.log(`[G-Code] Starting multi-layer export for ${layerModels.size} layers`);
 
         const post = POST_PROCESSORS[type](config);
         const lines: string[] = [...post.header];
@@ -544,7 +544,7 @@ export function generateGCodeForLayers(
 
         layerModels.forEach((model, layerId) => {
             try {
-                console.log(`[G-Code] Processing layer: ${layerId}`);
+                // console.log(`[G-Code] Processing layer: ${layerId}`);
                 lines.push(`(Layer: ${layerId})`);
 
                 let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
@@ -601,7 +601,7 @@ export function generateGCodeForLayers(
         });
 
         lines.push(...post.footer);
-        console.log('[G-Code] Multi-layer export complete');
+        // console.log('[G-Code] Multi-layer export complete');
         return lines.join('\n');
     } catch (error: any) {
         console.error('[G-Code] Multi-layer export failed:', error.message);

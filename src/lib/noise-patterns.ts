@@ -156,9 +156,9 @@ export class NoisePatterns {
     // Basic implementation using a grid
     cells(x: number, y: number, scale: number, seed: number = 0): number {
         // Debug: log first call to verify seed is being used
-        if (x === 0 && y === 0) {
-            console.log('[NoisePatterns.cells] seed:', seed);
-        }
+        // if (x === 0 && y === 0) {
+        //     console.log('[NoisePatterns.cells] seed:', seed);
+        // }
 
         const s = scale * 0.5; // Adjust scale to match others roughly
         const xi = Math.floor(x * s);
@@ -219,7 +219,7 @@ export class NoisePatterns {
 
     // Curl Noise (Divergence Free)
     // Returns angle 0..1 (representing 0..2PI)
-    curl(x, y, params: NoiseParams): number {
+    curl(x: number, y: number, params: NoiseParams): number {
         const eps = 0.001;
 
         // Potential function (psi)
