@@ -77,14 +77,14 @@ export class Patterns {
                         const y = j * stepY;
 
                         // Create a rectangle slightly smaller than the cell
-                        const rect: MakerJs.IModel = new MakerJs.models.Rectangle(stepX * 0.8, stepY * 0.8);
+                        const rect: MakerJs.IModel = new MakerJs.models.Rectangle(stepX, stepY);
 
                         // Mark as filled content
                         rect.layer = 'filled';
 
                         // Move to center of cell
-                        const cx = x + stepX / 2;
-                        const cy = y + stepY / 2;
+                        const cx = x;
+                        const cy = y;
                         MakerJs.model.center(rect);
                         MakerJs.model.move(rect, [cx, cy]);
 

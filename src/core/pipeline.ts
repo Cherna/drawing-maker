@@ -218,12 +218,29 @@ const GENERATORS: Record<string, GeneratorFn> = {
 // ==================== MODIFIERS ====================
 const MODIFIERS: Record<string, ModifierFn> = {
     'resample': (model, params) => {
-        // Param is 'detail' (0.1 to 10). Resolution (distance) should be inverse.
-        // Base resolution unit 1.0. 
-        // Detail 1 -> Res 1. Detail 10 -> Res 0.1. Detail 0.1 -> Res 10.
-        const detail = params.detail || params.res || 1.0;
+        const detail = params.detail ?? params.res ?? 1.0;
         const resolution = 1.0 / Math.max(0.01, detail);
         return Effects.resample(model, resolution);
+    },
+
+    // Explicit fill modifier: generates hatch lines inside all layer='filled' submodels.
+    // Place this BEFORE any warp/noise step so hatching deforms correctly with the geometry.
+    'fill': (model, params, _ctx, _bounds) => {
+        const fillParams = {
+            angle: params.angle ?? 0,
+            spacing: params.spacing ?? 0.5
+        };
+        const fillMarked = (m: MakerJs.IModel) => {
+            if (m.layer === 'filled') {
+                Filling.applyFilling(m, fillParams);
+                return;
+            }
+            if (m.models) {
+                for (const key in m.models) fillMarked(m.models[key]);
+            }
+        };
+        fillMarked(model);
+        // No return: mutates in-place
     },
 
     'clip': (model, params, ctx, bounds) => {
@@ -241,9 +258,12 @@ const MODIFIERS: Record<string, ModifierFn> = {
     },
 
     'noise': (model, params, ctx, bounds, mask) => {
+        const magnitude = params.magnitude ?? 5;
+        // Short-circuit: magnitude=0 means no displacement
+        if (magnitude === 0) return;
         Effects.noise(model, {
-            scale: params.scale || 0.05,
-            magnitude: params.magnitude || 5,
+            scale: params.scale ?? 0.05,
+            magnitude,
             axis: params.axis,
             seed: params.seed,
             octaves: params.octaves,
@@ -253,33 +273,31 @@ const MODIFIERS: Record<string, ModifierFn> = {
     },
 
     'trim': (model, params, ctx, bounds, mask) => {
-        Effects.trim(model, params.threshold || 0.5, mask || (() => 1), params.seed);
+        Effects.trim(model, params.threshold ?? 0.5, mask || (() => 1), params.seed);
     },
 
     'scale': (model, params, ctx, bounds) => {
         const origin: [number, number] = [bounds.width / 2, bounds.height / 2];
-        // Backend ignores "uniform" flag logic - it just uses x/y.
-        // Syncing is handled by frontend.
-        // Fallback to 'scale' param for old sketches.
-        const sx = params.x || params.scale || 1;
-        const sy = params.y || params.scale || 1;
-
+        const sx = params.x ?? params.scale ?? 1;
+        const sy = params.y ?? params.scale ?? 1;
         Effects.scale(model, sx, sy, origin);
     },
 
     'simplify': (model, params) => {
-        Effects.simplify(model, params.tolerance || 0.5);
+        Effects.simplify(model, params.tolerance ?? 0.5);
     },
 
     'glitch1': (model, params) => {
-        const iterations = params.iterations || 1;
-        const factor = params.factor || 0.5;
+        const iterations = params.iterations ?? 1;
+        const factor = params.factor ?? 0.5;
+        if (factor === 0) return model;
         return Effects.glitch1(model, iterations, factor);
     },
 
     'glitch2': (model, params) => {
-        const iterations = params.iterations || 3;
-        const factor = params.factor || 0.5;
+        const iterations = params.iterations ?? 3;
+        const factor = params.factor ?? 0.5;
+        if (factor === 0) return model;
         return Effects.glitch2(model, iterations, factor);
     },
 
@@ -356,7 +374,9 @@ const MODIFIERS: Record<string, ModifierFn> = {
 
     'warp': (model, params, ctx, bounds, mask) => {
         const type = params.type || 'bulge';
-        const strength = Number(params.strength) || 10;
+        const strength = params.strength !== undefined ? Number(params.strength) : 10;
+        // Short-circuit: strength=0 means no warp
+        if (strength === 0) return;
         const cx = bounds.width / 2;
         const cy = bounds.height / 2;
 
@@ -670,6 +690,7 @@ export class Pipeline {
         let currentModel: MakerJs.IModel | null = null;
         const bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
         const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
+        let filledApplied = false; // auto-fill guard: fill before the first modifier
 
         for (const step of steps) {
             if (step.enabled === false) {
@@ -708,6 +729,18 @@ export class Pipeline {
             if (MODIFIERS[step.tool]) {
                 if (!currentModel) {
                     throw new Error(`Pipeline Error: Cannot apply modifier '${step.tool}' without a base model.`);
+                }
+
+                // Auto-fill: inject hatch into 'filled'-layer submodels before the first
+                // displacement modifier so hatch lines warp together with their parent shapes.
+                if (!filledApplied && gcode && step.tool !== 'fill') {
+                    const fillParams = { angle: gcode.fillAngle ?? 0, spacing: gcode.fillSpacing ?? 0.5 };
+                    const autoFill = (m: MakerJs.IModel) => {
+                        if (m.layer === 'filled') { Filling.applyFilling(m, fillParams); return; }
+                        if (m.models) { for (const k in m.models) autoFill(m.models[k]); }
+                    };
+                    autoFill(currentModel);
+                    filledApplied = true;
                 }
 
                 let maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
@@ -766,9 +799,10 @@ export class Pipeline {
                 ]);
             }
 
-            // Apply solid filling if enabled
-            if (gcode && gcode.enableFilling) {
-                console.log('Pipeline: Applying solid filling...');
+            // Post-process fill: only if no modifier ran (i.e., auto-fill didn't trigger)
+            // or if user explicitly has 'fill' in their step list (already applied).
+            // If gcode enables filling AND auto-fill didn't run yet, do it now.
+            if (gcode?.enableFilling && !filledApplied) {
                 Filling.applyFilling(currentModel, {
                     angle: gcode.fillAngle ?? 0,
                     spacing: gcode.fillSpacing ?? 0.5
@@ -811,14 +845,11 @@ export class Pipeline {
             }
 
             let currentModel: MakerJs.IModel | null = null;
+            let filledApplied = false; // guard: auto-fill before first modifier
 
             // Execute each step in the layer's pipeline
             for (const step of layer.steps) {
-                if (step.enabled === false) {
-                    console.log(`  - ${step.tool} (MUTED)`);
-                    continue;
-                }
-                console.log(`  - ${step.tool}`);
+                if (step.enabled === false) continue;
 
                 // Get seed for this step (from step params, or global)
                 const stepSeed = step.params?.seed ?? globalSeed;
@@ -848,14 +879,23 @@ export class Pipeline {
                         throw new Error(`Pipeline Error: Cannot apply modifier '${step.tool}' without a base model in layer '${layer.name}'.`);
                     }
 
+                    // Auto-fill before the first modifier so hatch warps in sync with shapes
+                    if (!filledApplied && gcode && step.tool !== 'fill') {
+                        const fillParams = { angle: gcode.fillAngle ?? 0, spacing: gcode.fillSpacing ?? 0.5 };
+                        const autoFill = (m: MakerJs.IModel) => {
+                            if (m.layer === 'filled') { Filling.applyFilling(m, fillParams); return; }
+                            if (m.models) { for (const k in m.models) autoFill(m.models[k]); }
+                        };
+                        autoFill(currentModel);
+                        filledApplied = true;
+                    }
+
                     const maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
                     const modifierResult = await MODIFIERS[step.tool](currentModel, stepParams, ctx, localBounds, maskFn);
 
                     if (modifierResult) {
-                        // Modifier returned a new model
                         currentModel = modifierResult;
                     }
-                    // else: modifier mutated in-place, currentModel already updated
                     continue;
                 }
 
@@ -886,33 +926,10 @@ export class Pipeline {
                 }
 
                 if (currentModel) {
-                    const fillParams = {
-                        angle: gcode?.fillAngle ?? 0,
-                        spacing: gcode?.fillSpacing ?? 0.5
-                    };
-
-                    if (gcode?.enableFilling) {
-                        // Global filling enabled: Fill everything (recursive)
-                        console.log(`Pipeline: Global filling enabled for layer '${layer.name}'`);
+                    // If no modifier ran at all (generator-only), still apply fill at the end
+                    if (gcode?.enableFilling && !filledApplied) {
+                        const fillParams = { angle: gcode.fillAngle ?? 0, spacing: gcode.fillSpacing ?? 0.5 };
                         Filling.applyFilling(currentModel, fillParams);
-                    } else {
-                        // Global filling disabled: Only fill models explicitly marked as 'filled'
-                        console.log(`Pipeline: Global filling disabled, checking for 'filled' content in layer '${layer.name}'`);
-
-                        // Helper to find and fill marked models
-                        const fillMarkedModels = (m: MakerJs.IModel) => {
-                            if (m.layer === 'filled') {
-                                console.log(`Pipeline: Found marked content, applying filling...`);
-                                Filling.applyFilling(m, fillParams);
-                                // Don't recurse into already filled model
-                                return;
-                            }
-                            if (m.models) {
-                                for (const key in m.models) fillMarkedModels(m.models[key]);
-                            }
-                        };
-
-                        fillMarkedModels(currentModel);
                     }
                 }
 
@@ -935,7 +952,6 @@ export class Pipeline {
 
         for (const step of steps) {
             if (step.enabled === false) continue;
-            console.log(`Pipeline (Global): Executing ${step.tool}...`);
 
             if (MODIFIERS[step.tool]) {
                 const stepSeed = step.params?.seed ?? globalSeed;

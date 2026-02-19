@@ -148,99 +148,58 @@ export class Filling {
      * ensuring that transformations (origin, rotation) are preserved.
      */
     static applyFilling(model: MakerJs.IModel, params: FillParams): void {
-        console.log(`[DEBUG] applyFilling called with params:`, params);
-        let traverseCount = 0;
-        let totalLoopsFound = 0;
-        let totalChains = 0;
+        const hasExplicitFill = Filling.detectExplicitFill(model);
 
         const traverse = (m: MakerJs.IModel, depth: number = 0) => {
-            traverseCount++;
-            const indent = '  '.repeat(depth);
+            const shouldFill = hasExplicitFill ? (m.layer === 'filled') : true;
 
-            // Check for sub-models
             if (m.models) {
-                console.log(`${indent}[DEBUG] Traversing ${Object.keys(m.models).length} submodels at depth ${depth}`);
-                // Recurse into sub-models
                 for (const key in m.models) {
-                    console.log(`${indent}[DEBUG] - Processing submodel: ${key}`);
                     traverse(m.models[key], depth + 1);
                 }
             }
 
-            // Check paths in this model
-            if (m.paths && Object.keys(m.paths).length > 0) {
-                console.log(`${indent}[DEBUG] Found ${Object.keys(m.paths).length} paths at depth ${depth}`);
-
-                // Detect chains in this model's paths
+            if (shouldFill && m.paths && Object.keys(m.paths).length > 0) {
                 const pathsClone: MakerJs.IPathMap = {};
                 for (const k in m.paths) pathsClone[k] = MakerJs.cloneObject(m.paths[k]);
 
                 const pathModel = { paths: pathsClone };
-
-                // Use a generous tolerance for point matching to handle resample errors
                 const options = { pointMatchingDistance: 0.05, containment: false };
                 const chains = MakerJs.model.findChains(pathModel, options) as any[];
 
                 if (chains && chains.length > 0) {
-                    console.log(`${indent}[DEBUG] Found ${chains.length} chains in submodel.`);
-                    totalChains += chains.length;
-
                     const loops: MakerJs.IModel[] = [];
-                    chains.forEach((chain, chainIdx) => {
+                    chains.forEach((chain) => {
                         let isClosed = false;
 
-                        // Check if chain is endless (loop)
                         if (chain.endless) {
                             isClosed = true;
-                            console.log(`${indent}[DEBUG]   Chain ${chainIdx}: endless=true`);
-                        } else {
-                            // Check if start meets end manually
-                            // Chain has 'links' array
-                            if (chain.links && chain.links.length > 0) {
-                                const firstLink = chain.links[0];
-                                const lastLink = chain.links[chain.links.length - 1];
-
-                                // link.endPoints[0] is start, [1] is end
-                                const start = firstLink.endPoints[0];
-                                const end = lastLink.endPoints[1];
-
-                                if (MakerJs.measure.isPointEqual(start, end, 0.001)) {
-                                    isClosed = true;
-                                    console.log(`${indent}[DEBUG]   Chain ${chainIdx}: manually closed (${chain.links.length} links)`);
-                                } else {
-                                    console.log(`${indent}[DEBUG]   Chain ${chainIdx}: NOT closed (start: [${start[0].toFixed(2)}, ${start[1].toFixed(2)}], end: [${end[0].toFixed(2)}, ${end[1].toFixed(2)}])`);
-                                }
+                        } else if (chain.links && chain.links.length > 0) {
+                            const start = chain.links[0].endPoints[0];
+                            const end = chain.links[chain.links.length - 1].endPoints[1];
+                            if (MakerJs.measure.isPointEqual(start, end, 0.001)) {
+                                isClosed = true;
                             }
                         }
 
                         if (isClosed && chain.links) {
-                            // Convert chain to IModel
                             const loopModel: MakerJs.IModel = { paths: {} };
                             chain.links.forEach((link: any, i: number) => {
-                                // link.walkedPath.pathContext is the path
                                 if (link.walkedPath && link.walkedPath.pathContext) {
                                     loopModel.paths![`p_${i}`] = MakerJs.cloneObject(link.walkedPath.pathContext);
                                 }
                             });
                             loops.push(loopModel);
-                            totalLoopsFound++;
                         } else if (isClosed && !chain.links && chain.paths) {
                             loops.push(chain);
-                            totalLoopsFound++;
                         }
                     });
 
-                    console.log(`${indent}[DEBUG] Detected ${loops.length} closed loops at this level`);
-
-                    // Fill detected loops and add to the current model 'm'
                     loops.forEach((loop, i) => {
                         const hatch = Filling.fillLoop(loop, params);
                         if (hatch && Object.keys(hatch.paths || {}).length > 0) {
-                            console.log(`${indent}[DEBUG]   Loop ${i}: Generated ${Object.keys(hatch.paths || {}).length} hatch lines`);
                             if (!m.models) m.models = {};
                             m.models[`fill_${Date.now()}_${i}`] = hatch;
-                        } else {
-                            console.log(`${indent}[DEBUG]   Loop ${i}: No hatch lines generated`);
                         }
                     });
                 }
@@ -248,6 +207,17 @@ export class Filling {
         };
 
         traverse(model);
-        console.log(`[DEBUG] applyFilling complete. Traversed ${traverseCount} nodes, found ${totalChains} chains, ${totalLoopsFound} closed loops`);
+    }
+
+
+    private static detectExplicitFill(model: MakerJs.IModel): boolean {
+        if (model.layer === 'filled') return true;
+        if (model.models) {
+            for (const key in model.models) {
+                if (Filling.detectExplicitFill(model.models[key])) return true;
+            }
+        }
+        return false;
     }
 }
+

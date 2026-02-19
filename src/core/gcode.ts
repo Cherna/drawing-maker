@@ -183,6 +183,56 @@ function consolidateContinuousPaths(chains: MakerJs.IChain[], tolerance: number)
 }
 
 /**
+ * Collect paths that were not included in any chain (e.g. single lines/hatching)
+ * and wrap them in single-link chains.
+ */
+function collectOrphanedPaths(model: MakerJs.IModel, existingChains: MakerJs.IChain[]): MakerJs.IChain[] {
+    const usedPaths = new Set<MakerJs.IPath>();
+    existingChains.forEach(chain => {
+        if (chain.links) {
+            chain.links.forEach(link => {
+                if (link.walkedPath && link.walkedPath.pathContext) {
+                    usedPaths.add(link.walkedPath.pathContext);
+                }
+            });
+        }
+    });
+
+    const orphans: MakerJs.IChain[] = [];
+
+    MakerJs.model.walk(model, {
+        onPath: (walkPath) => {
+            if (!usedPaths.has(walkPath.pathContext)) {
+                // Create a chain for this orphan path
+                // We need to construct a valid IChain object with an IWalkLink
+                const path = walkPath.pathContext;
+                const offset = walkPath.offset || [0, 0];
+
+                // Calculate absolute endpoints
+                const origin = MakerJs.point.add(path.origin, offset);
+                const end = (path as any).end ? MakerJs.point.add((path as any).end, offset) : origin;
+
+                const link: any = {
+                    walkedPath: walkPath,
+                    endPoints: [origin, end],
+                    reversed: false
+                };
+
+                orphans.push({
+                    links: [link],
+                    endless: false,
+                    pathLength: MakerJs.measure.pathLength(path)
+                } as any);
+            }
+        }
+    });
+
+    // console.log(`[G-Code] Collected ${orphans.length} orphaned paths`);
+    return orphans;
+}
+
+
+/**
  * Detect groups of parallel lines (e.g., horizontal stripes)
  */
 function detectParallelLines(chains: MakerJs.IChain[]): MakerJs.IChain[][] {
@@ -424,13 +474,19 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
             return [finalX, finalY];
         };
 
-        let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
-        // console.log(`[G-Code] Found ${chains.length} path chains`);
+        // Flatten all nested model origins into path coordinates.
+        // MakerJs.chain.toKeyPoints returns LOCAL path coords (no parent offset).
+        // By originating first, all paths become absolute world coords, so
+        // toKeyPoints works correctly for both root paths and nested fill paths.
+        MakerJs.model.originate(model);
 
-        // Optimize path order if enabled - returns metadata
+        let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
+
+        const orphans = collectOrphanedPaths(model, chains);
+
+        // Optimize path order for main chains only
         let optimizedChains: OptimizedChain[];
         if (config.gcode.optimizePaths) {
-            // console.log('[G-Code] Optimizing path order...');
             optimizedChains = optimizeChainOrder(chains, config.gcode.joinTolerance || 0.01);
         } else {
             optimizedChains = chains.map(chain => ({ chain, reverse: false }));
@@ -438,59 +494,66 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
 
         let lineCount = 0;
 
-        optimizedChains.forEach((optimized: OptimizedChain, chainIndex: number) => {
+        const emitChainMoves = (optimized: OptimizedChain, chainIndex: number) => {
             try {
-                // Extract points from chain
                 let points = MakerJs.chain.toKeyPoints(optimized.chain, 1.0);
+                if (optimized.reverse) points = points.reverse();
 
-                if (optimized.reverse) {
-                    points = points.reverse();
-                }
-
-                // Ensure closed loops have the closing point
                 if (optimized.chain.endless && points.length > 0) {
                     const start = points[0];
                     const end = points[points.length - 1];
-                    // Check distance to handle floating point issues
-                    const dist = Math.hypot(start[0] - end[0], start[1] - end[1]);
-                    if (dist > 0.001) {
+                    if (Math.hypot(start[0] - end[0], start[1] - end[1]) > 0.001) {
                         points.push(start);
                     }
                 }
 
                 if (points.length === 0) return;
 
-                // Travel to start point
                 const [startX, startY] = transformCoords(points[0][0], points[0][1]);
-                lines.push(post.formatTravel(
-                    startX,
-                    startY,
-                    config.gcode.travelRate
-                ));
-
-                // Plunge
+                lines.push(post.formatTravel(startX, startY, config.gcode.travelRate));
                 lines.push(`G1 Z${config.gcode.zDown} F${config.gcode.feedRate}`);
-
                 if (config.gcode.dwellTime && config.gcode.dwellTime > 0) {
                     lines.push(post.formatDwell(config.gcode.dwellTime));
                 }
-
-                // Draw through ALL points (don't skip first!)
                 for (const point of points) {
                     const [px, py] = transformCoords(point[0], point[1]);
                     lines.push(post.formatMove(px, py));
                     lineCount++;
                 }
-
-                // Retract
                 lines.push(post.formatSafeZ(config.gcode.zUp));
             } catch (chainError: any) {
                 console.error(`[G-Code] Error processing chain ${chainIndex}:`, chainError.message);
             }
+        };
+
+        optimizedChains.forEach(emitChainMoves);
+
+        // Emit each orphan hatch line individually (pen-up between every segment)
+        orphans.forEach((orphan, i) => {
+            try {
+                // Use pre-computed absolute endpoints from the orphan link
+                const link = orphan.links[0] as any;
+                const p0 = link.endPoints[0] as MakerJs.IPoint;
+                const p1 = link.endPoints[1] as MakerJs.IPoint;
+                if (!p0 || !p1) return;
+
+                const [startX, startY] = transformCoords(p0[0], p0[1]);
+                const [endX, endY] = transformCoords(p1[0], p1[1]);
+
+                lines.push(post.formatTravel(startX, startY, config.gcode.travelRate));
+                lines.push(`G1 Z${config.gcode.zDown} F${config.gcode.feedRate}`);
+                if (config.gcode.dwellTime && config.gcode.dwellTime > 0) {
+                    lines.push(post.formatDwell(config.gcode.dwellTime));
+                }
+                lines.push(post.formatMove(endX, endY));
+                lines.push(post.formatSafeZ(config.gcode.zUp));
+                lineCount++;
+            } catch (e: any) {
+                console.error(`[G-Code] Error processing orphan ${i}:`, e.message);
+            }
         });
 
         lines.push(...post.footer);
-        // console.log(`[G-Code] Export complete: ${lineCount} segments`);
         return lines.join('\n');
     } catch (error: any) {
         console.error('[G-Code] Export failed:', error.message);
@@ -547,7 +610,12 @@ export function generateGCodeForLayers(
                 // console.log(`[G-Code] Processing layer: ${layerId}`);
                 lines.push(`(Layer: ${layerId})`);
 
+                // Flatten all nested model origins into path coordinates before chain analysis.
+                MakerJs.model.originate(model);
+
                 let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
+                const orphans = collectOrphanedPaths(model, chains);
+
 
                 let optimizedChains: OptimizedChain[];
                 if (config.gcode.optimizePaths) {
@@ -557,43 +625,51 @@ export function generateGCodeForLayers(
                 }
 
                 optimizedChains.forEach((optimized: OptimizedChain) => {
-                    // Extract points from chain
                     let points = MakerJs.chain.toKeyPoints(optimized.chain, 1.0);
+                    if (optimized.reverse) points = points.reverse();
 
-                    // Reverse the POINTS array if needed
-                    if (optimized.reverse) {
-                        points = points.reverse();
-                    }
-
-                    // Ensure closed loops have the closing point
                     if (optimized.chain.endless && points.length > 0) {
                         const start = points[0];
                         const end = points[points.length - 1];
-                        const dist = Math.hypot(start[0] - end[0], start[1] - end[1]);
-                        if (dist > 0.001) {
+                        if (Math.hypot(start[0] - end[0], start[1] - end[1]) > 0.001) {
                             points.push(start);
                         }
                     }
 
                     if (points.length === 0) return;
 
-                    const start = points[0];
-                    const [startX, startY] = transformCoords(start[0], start[1]);
-
+                    const [startX, startY] = transformCoords(points[0][0], points[0][1]);
                     lines.push(post.formatTravel(startX, startY, config.gcode.travelRate));
                     lines.push(`G1 Z${config.gcode.zDown} F${config.gcode.feedRate}`);
-
                     if (config.gcode.dwellTime && config.gcode.dwellTime > 0) {
                         lines.push(post.formatDwell(config.gcode.dwellTime));
                     }
-
-                    // Draw through remaining points
                     for (let i = 1; i < points.length; i++) {
                         const [px, py] = transformCoords(points[i][0], points[i][1]);
                         lines.push(post.formatMove(px, py));
                     }
-
                     lines.push(post.formatSafeZ(config.gcode.zUp));
+                });
+
+                // Orphan hatch lines: each gets its own pen-lift (never consolidated)
+                orphans.forEach((orphan, i) => {
+                    try {
+                        const link = orphan.links[0] as any;
+                        const p0 = link.endPoints[0] as MakerJs.IPoint;
+                        const p1 = link.endPoints[1] as MakerJs.IPoint;
+                        if (!p0 || !p1) return;
+                        const [startX, startY] = transformCoords(p0[0], p0[1]);
+                        const [endX, endY] = transformCoords(p1[0], p1[1]);
+                        lines.push(post.formatTravel(startX, startY, config.gcode.travelRate));
+                        lines.push(`G1 Z${config.gcode.zDown} F${config.gcode.feedRate}`);
+                        if (config.gcode.dwellTime && config.gcode.dwellTime > 0) {
+                            lines.push(post.formatDwell(config.gcode.dwellTime));
+                        }
+                        lines.push(post.formatMove(endX, endY));
+                        lines.push(post.formatSafeZ(config.gcode.zUp));
+                    } catch (e: any) {
+                        console.error(`[G-Code] Error processing orphan ${i}:`, e.message);
+                    }
                 });
             } catch (layerError: any) {
                 console.error(`[G-Code] Error processing layer ${layerId}:`, layerError.message);

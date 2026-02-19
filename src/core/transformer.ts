@@ -183,49 +183,71 @@ export class Transformer {
      * Preserves object identity for shared points (e.g. polyline chains).
      */
     static displace(model: MakerJs.IModel, displaceFn: (x: number, y: number) => { x: number, y: number }): void {
-        // Cache displaced points to preserve topology
-        // Index by object ref AND coordinates to merge identical points (e.g. seams)
+        // Cache displaced points by world-coord key to preserve topology and merge seams
         const pointCache = new Map<MakerJs.IPoint, MakerJs.IPoint>();
-        const coordCache = new Map<string, MakerJs.IPoint>();
+        const worldKeyCache = new Map<string, MakerJs.IPoint>();
 
-        const getDisplacedPoint = (p: MakerJs.IPoint): MakerJs.IPoint => {
-            // 1. Check object cache
+        /**
+         * Displaces point `p` (in local space) using world coordinates for noise sampling.
+         * offsetX/offsetY are the accumulated parent origins.
+         * displaceFn is called with world coords; only the delta is applied to local coords.
+         *
+         * Cache keyed by (offsetX, offsetY, localX, localY) so two points at the same world
+         * position but in different local frames never share a cached result.
+         */
+        const getDisplacedPoint = (p: MakerJs.IPoint, offsetX: number, offsetY: number): MakerJs.IPoint => {
+            // Fast path: same object reference (shared point — always safe to reuse)
             if (pointCache.has(p)) {
                 return pointCache.get(p)!;
             }
 
-            // 2. Check coordinate cache (to merge seams where points are distinct objects but same loc)
-            // Use high precision key
-            const key = `${p[0]},${p[1]}`;
-            if (coordCache.has(key)) {
-                // Should we return the existing object?
-                // Yes, this merges the topology.
-                const existing = coordCache.get(key)!;
-                pointCache.set(p, existing); // Map this point ref to the existing one too
+            // Compute world-space position for noise sampling
+            const worldX = p[0] + offsetX;
+            const worldY = p[1] + offsetY;
+
+            // Cache key includes the offset context so cross-model collisions are impossible
+            const cacheKey = `${offsetX.toFixed(4)},${offsetY.toFixed(4)},${p[0].toFixed(6)},${p[1].toFixed(6)}`;
+            if (worldKeyCache.has(cacheKey)) {
+                const existing = worldKeyCache.get(cacheKey)!;
+                pointCache.set(p, existing);
                 return existing;
             }
 
-            // 3. Create new
-            const newPos = displaceFn(p[0], p[1]);
-            const newPoint: MakerJs.IPoint = [newPos.x, newPos.y];
+            // Call displaceFn with world coords — returns a new absolute world position
+            const newWorldPos = displaceFn(worldX, worldY);
+
+            // Apply only the delta to the local coordinate
+            const dx = newWorldPos.x - worldX;
+            const dy = newWorldPos.y - worldY;
+            const newPoint: MakerJs.IPoint = [p[0] + dx, p[1] + dy];
 
             pointCache.set(p, newPoint);
-            coordCache.set(key, newPoint);
+            worldKeyCache.set(cacheKey, newPoint);
 
             return newPoint;
         };
 
-        MakerJs.model.walk(model, {
-            onPath: (walkPath) => {
-                const path = walkPath.pathContext;
-                if (path.type === 'line') {
-                    const line = path as MakerJs.IPathLine;
+        // Use a different approach: walk needs offset info, so use a manual walk instead
+        const walkWithOffset = (m: MakerJs.IModel, offsetX: number, offsetY: number) => {
+            const ox = offsetX + (m.origin?.[0] ?? 0);
+            const oy = offsetY + (m.origin?.[1] ?? 0);
 
-                    // Update ends using the cache to preserve connectivity
-                    line.origin = getDisplacedPoint(line.origin);
-                    line.end = getDisplacedPoint(line.end);
+            if (m.paths) {
+                for (const path of Object.values(m.paths)) {
+                    if (path.type === 'line') {
+                        const line = path as MakerJs.IPathLine;
+                        line.origin = getDisplacedPoint(line.origin, ox, oy);
+                        line.end = getDisplacedPoint(line.end, ox, oy);
+                    }
                 }
             }
-        });
+            if (m.models) {
+                for (const child of Object.values(m.models)) {
+                    walkWithOffset(child, ox, oy);
+                }
+            }
+        };
+
+        walkWithOffset(model, 0, 0);
     }
 }
