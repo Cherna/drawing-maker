@@ -49,24 +49,9 @@ export class Effects {
     static noise(model: MakerJs.IModel, options: NoiseOptions, mask?: (x: number, y: number) => number) {
         // Auto-resample if model contains curves, as displace only works on lines
         if (modelHasArcs(model)) {
-            // Use a default reasonable resolution (e.g. 0.5mm) if not specified
-            // Since we are modifying in place (conceptually), we update the reference
-            // But resample returns a NEW model. We must return it.
-            // However, the pipeline expects us to modify the passed model or return a new one.
-            // Our signature is static noise(model, ...).
-            // Code in pipeline: Effects.noise(model, ...)
-            // It ignores return value! 
-            // WAIT: pipeline.ts says: 
-            // 'noise': (model, params, ...) => { Effects.noise(model, ...); }
-            // Effects.noise returns model, but pipeline ignores it?
-            // "if (result) currentModel = result;" in pipeline.
-            // So we MUST return the new model if we resample.
-
-            const resampled = Transformer.resample(model, 0.5);
-            // Replace contents of original model with resampled one?
-            // Or just return resampled?
-            // If we return resampled, pipeline will use it.
-            model = resampled;
+            // Default reasonable resolution (0.5mm)
+            // We must return the newly resampled reference so it updates in the pipeline
+            model = Transformer.resample(model, 0.5);
         }
 
         const seed = options.seed ?? Date.now();

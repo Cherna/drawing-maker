@@ -1,7 +1,7 @@
 export interface ToolParamDef {
   key: string;
   label: string;
-  type: 'number' | 'text' | 'select' | 'boolean';
+  type: 'number' | 'text' | 'select' | 'boolean' | 'image';
   min?: number;
   max?: number;
   step?: number;
@@ -181,6 +181,30 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'padding', label: 'Gap Size', type: 'number', min: 0, max: 20, step: 0.1, default: 2 },
       { key: 'relaxation', label: 'Relaxation', type: 'number', min: 0, max: 50, step: 1, default: 0 },
       { key: 'seed', label: 'Seed', type: 'number', min: 0, max: 9999, step: 1, default: 0 },
+    ],
+  },
+  'image-hatching': {
+    category: 'generator',
+    label: 'Image Hatching',
+    params: [
+      { key: 'densityMap', label: 'Density Map (Image)', type: 'image' },
+      { key: 'normalMap', label: 'Normal Map (Optional)', type: 'image' },
+      { key: 'shadingSteps', label: 'Shading Steps', type: 'number', min: 1, max: 20, step: 1, default: 5 },
+      { key: 'density', label: 'Density Multiplier', type: 'number', min: 0.1, max: 10, step: 0.1, default: 1.5 },
+      { key: 'baseAngle', label: 'Base Angle', type: 'number', min: 0, max: 360, step: 1, default: 45 },
+      { key: 'crossHatch', label: 'Cross-hatch', type: 'boolean', default: false },
+      { key: 'threshold', label: 'Ignore Brightness >', type: 'number', min: 0, max: 1, step: 0.05, default: 0.95 },
+      { key: 'scale', label: 'Scale', type: 'number', min: 0.1, max: 10, step: 0.1, default: 1 },
+      { key: 'offsetX', label: 'Offset X (%)', type: 'number', min: -100, max: 100, step: 1, default: 0 },
+      { key: 'offsetY', label: 'Offset Y (%)', type: 'number', min: -100, max: 100, step: 1, default: 0 },
+      { key: 'flipX', label: 'Flip X', type: 'boolean', default: false },
+      { key: 'flipY', label: 'Flip Y', type: 'boolean', default: false },
+      { key: 'crossHatchChance', label: 'Alt-Dir Chance', type: 'number', min: 0, max: 1, step: 0.05, default: 0 },
+      { key: 'minPeriod', label: 'Min Period (darkest)', type: 'number', min: 1, max: 10, step: 1, default: 1 },
+      { key: 'maxPeriod', label: 'Max Period (lightest)', type: 'number', min: 1, max: 20, step: 1, default: 6 },
+      { key: 'densityCurve', label: 'Density Curve', type: 'number', min: 0.1, max: 3, step: 0.1, default: 1 },
+      { key: 'drawContour', label: 'Draw Contour', type: 'boolean', default: false },
+      { key: 'contourThreshold', label: 'Contour Threshold', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5 },
     ],
   },
   'hatching': {

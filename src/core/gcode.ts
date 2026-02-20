@@ -449,25 +449,18 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         const canvasHeight = config.canvas.height;
 
         const transformCoords = (x: number, y: number): [number, number] => {
-            // Step 1: Y-flip from SVG (Y+ down) to Cartesian (Y+ up)
-            // This converts screen coordinates to the same coordinate space as the origin
-            let finalX = x;
+            // Neutral mapping: canvasHeight - y converts MakerJS (Y=0 bottom) to screen-like (Y=0 top).
+            // invertY:true (default) then negates this to Y-negative machine space.
+            // invertY:false keeps Y-positive for machines with bottom-left origin.
+            let finalX = x - (config.gcode.originX || 0);
             let finalY = canvasHeight - y;
 
-            // Step 2: Apply origin offset (both now in Cartesian space)
-            finalX = finalX - (config.gcode.originX || 0);
-            finalY = finalY - (config.gcode.originY ?? canvasHeight);
-
-            // Step 3: Negate Y to match CNC convention
-            // (drawing extends downward/rightward from origin in machine space)
-            finalY = -finalY;
-
-            // Step 4: Apply axis swap (transpose X and Y)
+            // Apply axis swap
             if (config.gcode.swapAxes) {
                 [finalX, finalY] = [finalY, finalX];
             }
 
-            // Step 5: Apply invert flags
+            // Apply invert flags (invertY:true = Y-negative machine space)
             if (config.gcode.invertX) finalX = -finalX;
             if (config.gcode.invertY) finalY = -finalY;
 
@@ -580,25 +573,17 @@ export function generateGCodeForLayers(
         const canvasHeight = config.canvas.height;
 
         const transformCoords = (x: number, y: number): [number, number] => {
-            // Step 1: Y-flip from SVG (Y+ down) to Cartesian (Y+ up)
-            // This converts screen coordinates to the same coordinate space as the origin
-            let finalX = x;
+            // Neutral mapping: canvasHeight - y converts MakerJS (Y=0 bottom) to screen-like (Y=0 top).
+            // invertY:true (default) then negates this to Y-negative machine space.
+            let finalX = x - (config.gcode.originX || 0);
             let finalY = canvasHeight - y;
 
-            // Step 2: Apply origin offset (both now in Cartesian space)
-            finalX = finalX - (config.gcode.originX || 0);
-            finalY = finalY - (config.gcode.originY ?? canvasHeight);
-
-            // Step 3: Negate Y to match CNC convention
-            // (drawing extends downward/rightward from origin in machine space)
-            finalY = -finalY;
-
-            // Step 4: Apply axis swap (transpose X and Y)
+            // Apply axis swap
             if (config.gcode.swapAxes) {
                 [finalX, finalY] = [finalY, finalX];
             }
 
-            // Step 5: Apply invert flags
+            // Apply invert flags (invertY:true = Y-negative machine space)
             if (config.gcode.invertX) finalX = -finalX;
             if (config.gcode.invertY) finalY = -finalY;
 

@@ -7,6 +7,7 @@ import { Masks } from '../lib/masks';
 import { NoisePatterns, NoiseParams } from '../lib/noise-patterns';
 import { Filling } from '../lib/filling';
 import { GCodeConfig } from '../types';
+import { ImageHatching } from './generators/image-hatching';
 
 type GeneratorFn = (params: any, ctx: CanvasConfig, bounds: Box) => MakerJs.IModel | Promise<MakerJs.IModel>;
 type ModifierFn = (model: MakerJs.IModel, params: any, ctx: CanvasConfig, bounds: Box, mask?: (x: number, y: number) => number) => Promise<MakerJs.IModel | void> | MakerJs.IModel | void;
@@ -212,6 +213,10 @@ const GENERATORS: Record<string, GeneratorFn> = {
             relaxation: params.relaxation,
             seed: params.seed
         });
+    },
+
+    'image-hatching': async (params, ctx, bounds) => {
+        return ImageHatching.generate(bounds.width, bounds.height, params);
     }
 };
 
@@ -443,9 +448,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
                         const dy = y - cy;
                         const dist = Math.hypot(dx, dy);
                         const maxDist = Math.hypot(cx, cy); // Normalize by canvas size
-                        // Strength should decay with distance? or increase?
-                        // Pinch usually means center is sucked in.
-                        // Let's try exponential falloff
+                        // Applies exponential falloff for pinch strength
                         const factor = Math.exp(-dist * 0.01) * (strength / 10);
                         return {
                             dx: -dx * factor,

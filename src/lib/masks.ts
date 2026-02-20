@@ -227,14 +227,7 @@ export class Masks {
 
         return (x, y) => {
             const targetType = type === 'noise' ? 'simplex' : type;
-            // Apply offset to input coordinates
-            // Since x,y are in mm (or relative to canvas logic), adding offset moves the pattern.
-            // If scale is small (frequency high), offset might need to be large to move significantly?
-            // "Move the mask so it moves where it applies" -> Translation.
-            // patterns.get usually takes "scaled" coords inside, but here we pass raw coords and it scales them.
-            // Wait, patterns.get does: this.noise2D(x * scale, y * scale).
-            // So if we simply add to x: patterns.get(x + offsetX, ...) -> noise((x + offsetX) * scale)
-            // This is correct for "moving the origin".
+            // Apply offset to input coordinates for translation.
             return patterns.get(targetType as any, x + offsetX, y + offsetY, noiseParams, seed);
         };
     }

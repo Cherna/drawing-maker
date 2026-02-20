@@ -255,27 +255,9 @@ export default function LayersEditor() {
         ...config.params,
         layers: updatedLayers,
         steps: flatSteps,
-
       }
     });
-    // Wait, the original `handleToggleVisibility` used `activeLayerId: newLayerId`? No.
-    // Original code: line 239 just closed `updateConfig`.
-    // My replacement needs to match perfectly.
-    // I should probably split this into smaller chunks or copy exact original code for unmodified functions.
-    // OR better: Just target `handleCreateLayer`, `handleDuplicateLayer` and the JSX input.
-    // Targeting lines 153-202 covers create and duplicate.
-    // Then target 388-410 for input.
-    // I will split into 2 chunks.
   };
-
-  // ... Wait, I should not replace multiple functions if I can avoid it.
-  // Chunk 1: handleCreateLayer and handleDuplicateLayer.
-  // Chunk 2: JSX Input.
-
-  // Actually, I'll just use MultiReplace.
-
-
-
 
   const handleUpdateLayerColor = (layerId: string, color: string) => {
     const updatedLayers = layers.map(layer =>

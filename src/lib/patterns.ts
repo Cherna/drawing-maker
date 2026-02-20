@@ -695,14 +695,7 @@ export class Patterns {
         // The horizontal lines are spaced by this height.
         const heightTri = (Math.sqrt(3) / 2) * size;
 
-        // We reuse the Hatching generator logic but need to be careful about line count/spacing.
-        // Hatching takes "count" over the diagonal.
-        // We want specific spacing.
-        // Let's implement manually using Hatching's underlying clipping logic but controlling precise spacing.
-
-        // Actually, Hatching(count) calculates spacing = diag / count.
-        // We want spacing = heightTri.
-        // So count = diag / heightTri.
+        // Spacing should match triangle height. Hatching count is diag / spacing.
         const diag = Math.hypot(width, height);
         const count = Math.ceil(diag / heightTri);
 
@@ -862,8 +855,7 @@ export class Patterns {
             octaves: options?.octaves || 1,
             persistence: options?.persistence || 0.5,
             lacunarity: options?.lacunarity || 2,
-            distortion: 0 // Not relevant for flow field angle itself usually, or we could use it?
-            // Actually 'distortion' param in options acts as 'Angle Scale' here.
+            distortion: 0 // Handled externally as 'Angle Scale' here.
         };
 
         // Use our NoisePatterns class

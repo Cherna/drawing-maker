@@ -23,10 +23,7 @@ export default function GlobalStepItem({ step, index }: GlobalStepItemProps) {
     const globalSteps = useConfigStore((state) => state.config.params?.globalSteps || []);
 
     const toolDef = TOOL_DEFINITIONS[step.tool];
-    // We generally don't support nested steps in global modifiers for simplicity first, 
-    // but if we did, we'd need a GlobalNestedStepsEditor. 
-    // Let's stick to flat modifiers for now as per plan (implicit).
-
+    // We generally don't support nested steps in global modifiers for simplicity. 
     const handleToolChange = (newTool: string) => {
         const newToolDef = TOOL_DEFINITIONS[newTool];
         const newParams: any = {};
@@ -68,14 +65,7 @@ export default function GlobalStepItem({ step, index }: GlobalStepItemProps) {
         }
     };
 
-    // Move logic for global steps?
-    // I didn't verify if I added moveGlobalStep action.
-    // I checked config-store.ts edit, I added: add, update, remove. NOT move.
-    // So I cannot implement move up/down yet without store support.
-    // I will skip move buttons or implement array swap locally?
-    // Local swap is risky with Zustand temporal.
-    // I will comment out move buttons for now or assume I add logic to store later.
-    // Or I can update the store right now to add `moveGlobalStep`.
+    // Move logic requires dedicated moveGlobalStep in the store.
 
     return (
         <Card className="relative">

@@ -2,7 +2,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-// Slider removed in favor of ScrubbableInput
+import { Button } from './ui/button';
 import { useConfigStore } from '../store/config-store';
 import ScrubbableInput from './ui/scrubbable-input';
 import { PipelineStep } from '../../types';
@@ -37,46 +37,8 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
     }
 
     if (onUpdate) {
-      // If parent provided onUpdate, we might need to pass the whole params object
-      // if we effectively changed multiple keys.
-      // However, onUpdate signature is (key, value).
-      // Let's check if we can pass 'params' as key. 
-      // LayerStepItem handles: onUpdate(index, { params: ... }) from its own context,
-      // but passes (key, value) to StepParams. 
-      // We need to check LayerStepItem's implementation of onUpdate passed to StepParams.
-
-      // Looking at LayerStepItem: 
-      // onUpdate={(key, value) => { if (key==='mask') ... else onUpdate(index, { params: { ...step.params, [key]: value } }) }}
-      // It ONLY updates [key]: value. It misses our side effects!
-
-      // We CANNOT easily fix this just inside StepParams without changing the Interface
-      // OR we "hack" it by calling onUpdate multiple times? No, state updates might batch/override.
-
-      // The robust fix: Detect if we changed other keys.
-      // If we did (Scale sync), we must update the whole 'params' object.
-      // But LayerStepItem expects (key, value). 
-      // Use 'params' as the key to update the whole object?
-      // LayerStepItem logic: onUpdate(index, { params: { ...step.params, [key]: value } })
-      // If we pass key='params', it becomes { params: { ...step.params, params: value } } -> Wrong nesting!
-
-      // Wait, I can see LayerStepItem source. 
-      // It does: onUpdate(index, { params: { ...step.params, [key]: value } })
-
-      // I need to change LayerStepItem to accept a full params update or handle side effects.
-      // OR: I modify StepParams here to directy call store if onUpdate is insufficient? No, LayerStepItem uses local state or parent state.
-
-      // Let's assume I will update LayerStepItem to handle key="params" correctly OR add onParamsChange.
-      // Let's add support for key="params" in LayerStepItem? 
-      // OR just pass the whole object if the key is special?
-
-      // Let's try to pass the side-effects via multiple calls?
-      // No.
-
-      // I will implement: passing key="ALL_PARAMS" (special) or just assume LayerStepItem refactor.
-      // Actually, updateParam in StepParams is already checking keys.
-
-      // Let's just assume I'll fix LayerStepItem too.
-      // For now, let's implement the logic assuming we can pass full params.
+      // Pass the entire params object so the parent (e.g. LayerStepItem) 
+      // can handle updates to multiple keys simultaneously (like Scale sync).
       onUpdate('params', newParams);
     } else {
       // Fallback to store update
@@ -136,6 +98,49 @@ export default function StepParams({ step, index, onUpdate }: StepParamsProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          );
+        }
+
+        if (paramDef.type === 'image') {
+          return (
+            <div key={paramDef.key} className="space-y-2">
+              <Label htmlFor={`${index}-${paramDef.key}`}>{paramDef.label}</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id={`${index}-${paramDef.key}`}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    // Convert file to Data URL
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      if (event.target?.result) {
+                        updateParam(paramDef.key, event.target.result);
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                {value && (
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    updateParam(paramDef.key, '');
+                    // Also clear the file input so selecting the same file again triggers onChange
+                    const fileInput = document.getElementById(`${index}-${paramDef.key}`) as HTMLInputElement;
+                    if (fileInput) fileInput.value = '';
+                  }}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {value && (
+                <div className="mt-2 border rounded p-1 bg-black/5 flex items-center justify-center">
+                  <img src={value as string} alt="preview" className="max-h-32 object-contain" />
+                </div>
+              )}
             </div>
           );
         }
