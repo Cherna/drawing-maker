@@ -34,9 +34,25 @@ export class ImageHatching {
             return model;
         }
 
-        const base64Data = options.densityMap.replace(/^data:image\/\w+;base64,/, "");
+        const base64Data = options.densityMap.replace(/^data:image\/[^;]+;base64,/, "");
         const imageBuffer = Buffer.from(base64Data, 'base64');
-        // Do NOT call .grayscale() here â€” it strips the alpha channel before ensureAlpha()
+        // DEBUG: Check the data URL prefix and buffer metadata
+        const dataUrlPrefix = options.densityMap.substring(0, 80);
+        console.log('[hatching-debug] densityMap data URL prefix:', dataUrlPrefix);
+        console.log('[hatching-debug] imageBuffer length:', imageBuffer.length);
+        // Check what sharp thinks the input format is
+        const inputMeta = await sharp(imageBuffer).metadata();
+        console.log('[hatching-debug] sharp metadata:', JSON.stringify({
+            format: inputMeta.format,
+            width: inputMeta.width,
+            height: inputMeta.height,
+            channels: inputMeta.channels,
+            hasAlpha: inputMeta.hasAlpha,
+            space: inputMeta.space,
+            depth: inputMeta.depth,
+            density: inputMeta.density
+        }));
+        // Do NOT call .grayscale() here — it strips the alpha channel before ensureAlpha()
         // can preserve it, causing transparent pixels to become opaque black.
         // Grayscale is computed manually via the luma formula in getDensity().
         // Force RGBA (4 channels) so channel indexing is always predictable.
@@ -128,48 +144,64 @@ export class ImageHatching {
                 + s11 * tx * ty;
         };
 
-        // ── Normal Map Tangent Sampling ─────────────────────────────────────────
+        // ── Normal Map Tangent Sampling (bilinear, uses normal map's own dimensions) ──
+        const nWidth = rawNormal ? rawNormal.info.width : 0;
+        const nHeight = rawNormal ? rawNormal.info.height : 0;
+        const nBaseScale = nWidth > 0 ? Math.max(width / nWidth, height / nHeight) : 1;
+        const nScale = nBaseScale * userScale;
+        const nImgW = nWidth * nScale;
+        const nImgH = nHeight * nScale;
+        const nStartX = (width - nImgW) / 2 + (userOffsetX * width / 100);
+        const nStartY = (height - nImgH) / 2 + (userOffsetY * height / 100);
+
         const getTangent = (x: number, y: number): { vx: number, vy: number } | null => {
             if (!rawNormal) return null;
-            const fx = (x - startX) / scale;
-            const fy = (startY + imgH - y) / scale;
 
-            // Outside image bounds â†’ flow straight horizontally as fallback
-            if (fx < -0.5 || fx >= dWidth - 0.5 || fy < -0.5 || fy >= dHeight - 0.5) return null;
+            const fx = (x - nStartX) / nScale;
+            const fy = (nStartY + nImgH - y) / nScale;
 
-            const applyFlipX = (px: number) => options.flipX ? (dWidth - 1) - px : px;
-            const applyFlipY = (py: number) => options.flipY ? (dHeight - 1) - py : py;
+            if (fx < -0.5 || fx >= nWidth - 0.5 || fy < -0.5 || fy >= nHeight - 0.5) return null;
 
-            const bx = applyFlipX(Math.max(0, Math.min(dWidth - 1, Math.round(fx))));
-            const by = applyFlipY(Math.max(0, Math.min(dHeight - 1, Math.round(fy))));
+            const applyFlipX = (px: number) => options.flipX ? (nWidth - 1) - px : px;
+            const applyFlipY = (py: number) => options.flipY ? (nHeight - 1) - py : py;
 
+            const nData = rawNormal.data;
             const nChannels = rawNormal.info.channels;
-            const idx = (by * dWidth + bx) * nChannels;
 
-            // R: X-axis (-1 left to 1 right)
-            // G: Y-axis (-1 down to 1 up)
-            // B: Z-axis (forward)
-            const r = rawNormal.data[idx];
-            const g = rawNormal.data[idx + 1];
+            const sampleNormal = (px: number, py: number): { nx: number, ny: number } => {
+                const bx = applyFlipX(Math.max(0, Math.min(nWidth - 1, px)));
+                const by = applyFlipY(Math.max(0, Math.min(nHeight - 1, py)));
+                const idx = (by * nWidth + bx) * nChannels;
+                const snx = (nData[idx] / 255) * 2.0 - 1.0;
+                let sny = (nData[idx + 1] / 255) * 2.0 - 1.0;
+                if (options.flipY) sny = -sny;
+                return { nx: snx, ny: sny };
+            };
 
-            // Remap [0, 255] to [-1.0, 1.0]
-            // Standard normal map: R=128, G=128 is "flat" (facing camera)
-            const nx = (r / 255) * 2.0 - 1.0;
-            // IMPORTANT: Normal map G channel conventions vary (DirectX vs OpenGL).
-            // Usually Y goes *up*, but image coords go down. We assume standard +Y=Up.
-            let ny = (g / 255) * 2.0 - 1.0;
-            if (options.flipY) ny = -ny; // User flip might affect normal direction
+            // Bilinear interpolation of the normal XY components
+            const x0 = Math.floor(fx);
+            const y0 = Math.floor(fy);
+            const tx = fx - x0;
+            const ty = fy - y0;
 
-            // The surface normal is (nx, ny, nz).
-            // To hatch *along* the surface, we want a tangent.
-            // Rotating the XY normal vector by 90Â° gives a tangent flow direction: [-ny, nx].
-            let tx = -ny;
-            let ty = nx;
+            const s00 = sampleNormal(x0, y0);
+            const s10 = sampleNormal(x0 + 1, y0);
+            const s01 = sampleNormal(x0, y0 + 1);
+            const s11 = sampleNormal(x0 + 1, y0 + 1);
 
-            const len = Math.hypot(tx, ty);
-            if (len < 0.001) return null; // Flat area: fallback
+            const nx = s00.nx * (1 - tx) * (1 - ty) + s10.nx * tx * (1 - ty)
+                + s01.nx * (1 - tx) * ty + s11.nx * tx * ty;
+            const ny = s00.ny * (1 - tx) * (1 - ty) + s10.ny * tx * (1 - ty)
+                + s01.ny * (1 - tx) * ty + s11.ny * tx * ty;
 
-            return { vx: tx / len, vy: ty / len };
+            // Rotate XY normal 90° to get the surface tangent: (-ny, nx)
+            const tvx = -ny;
+            const tvy = nx;
+
+            const len = Math.hypot(tvx, tvy);
+            if (len < 0.001) return null; // Flat area: callers fall back to baseAngle
+
+            return { vx: tvx / len, vy: tvy / len };
         };
 
         const baseAngleRad = (options.baseAngle || 45) * Math.PI / 180;
@@ -187,12 +219,12 @@ export class ImageHatching {
         // <1 = more lines in dark areas (emphasises darks), >1 = sparsely spaced (emphasises lights)
         const densityCurve = Math.max(0.1, options.densityCurve ?? 1.0);
 
-        // -------------------------------------------------------------------------
+        // â”€â”€ Shared Boundary Segments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // buildBoundary() runs the strand-accumulation contour scan, applies smoothing,
         // and returns a flat list of [x1,y1,x2,y2] segments in world (canvas) space.
         // These are used both for drawing the contour line AND for clipping hatch lines,
         // so both operations share exactly the same clean edge.
-        // -------------------------------------------------------------------------
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         interface Seg2D { x1: number; y1: number; x2: number; y2: number; }
 
         const buildBoundary = (bThresh: number): Seg2D[] => {
@@ -271,20 +303,20 @@ export class ImageHatching {
             return resultSegs;
         };
 
-        // -------------------------------------------------------------------------
+        // â”€â”€ Scan-line Ã— boundary intersection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // For a scan line at perpendicular offset y (in rotated frame), direction cosA/sinA,
         // find all x-parameters along the scan line where it crosses boundary segment seg.
         //
-        // Scan point at param x: world = (cx + x * cosA - y * sinA,  cy + x * sinA + y * cosA)
-        // Segment from A to B:   world = A + t * (B - A),  t in [0,1]
+        // Scan point at param x: world = (cx + xÂ·cosA âˆ’ yÂ·sinA,  cy + xÂ·sinA + yÂ·cosA)
+        // Segment from A to B:   world = A + tÂ·(Bâˆ’A),  t âˆˆ [0,1]
         //
-        // 2x2 system (Cramer's rule):
-        //   x * cosA - t * ddx = rx    where rx = Ax - cx + y * sinA
-        //   x * sinA - t * ddy = ry          ry = Ay - cy - y * cosA
-        //   det = ddx * sinA - cosA * ddy
-        //   x   = (-rx * ddy + ry * ddx) / det
-        //   t   = ( cosA * ry - sinA * rx) / det
-        // -------------------------------------------------------------------------
+        // 2Ã—2 system (Cramer's rule):
+        //   xÂ·cosA âˆ’ tÂ·ddx = rx    where rx = Ax âˆ’ cx + yÂ·sinA
+        //   xÂ·sinA âˆ’ tÂ·ddy = ry          ry = Ay âˆ’ cy âˆ’ yÂ·cosA
+        //   det = ddxÂ·sinA âˆ’ cosAÂ·ddy
+        //   x   = (âˆ’rxÂ·ddy + ryÂ·ddx) / det
+        //   t   = ( cosAÂ·ry âˆ’ sinAÂ·rx) / det
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const hatchClipXValues = (
             cx: number, cy: number,
             cosA: number, sinA: number,
@@ -496,26 +528,21 @@ export class ImageHatching {
             }
         };
 
-        // ── Streamline Hatching (Normal Map Driven) ─────────────────────────────
+        // ── Streamline Hatching (Normal Map Driven) ───────────────────────────────
         const runStreamlineHatching = () => {
             const stepLen = 0.5; // mm per integration step
-            const maxRadius = Math.hypot(width, height) / 2;
-            const cx = width / 2;
-            const cy = height / 2;
-
             const bThresh = options.contourThreshold ?? threshold;
             const boundary = buildBoundary(bThresh);
 
-            // Spatial density tracking via a coarse grid
-            // Grid cell size matches the minSpacing we want in the darkest areas.
+            // Spatial density tracking: one cell per minSpacing/2 square
             const cellSize = minSpacing / 2;
             const gridCols = Math.ceil(width / cellSize);
             const gridRows = Math.ceil(height / cellSize);
             const spatialGrid = new Int8Array(gridCols * gridRows);
 
-            const getCell = (x: number, y: number) => {
-                const c = Math.floor(x / cellSize);
-                const r = Math.floor(y / cellSize);
+            const getCell = (wx: number, wy: number) => {
+                const c = Math.floor(wx / cellSize);
+                const r = Math.floor(wy / cellSize);
                 if (c < 0 || c >= gridCols || r < 0 || r >= gridRows) return -1;
                 return r * gridCols + c;
             };
@@ -523,17 +550,17 @@ export class ImageHatching {
             let lineIdCounter = 0;
             const R = (v: number) => Math.round(v * 1000) / 1000;
 
-            // Generate seed points on a grid across the canvas
+            // Hex-offset seed grid across the canvas
             const seeds: { x: number, y: number }[] = [];
             const seedSpacing = minSpacing;
-            for (let y = 0; y < height; y += seedSpacing) {
-                const xOffset = (Math.floor(y / seedSpacing) % 2) * (seedSpacing / 2);
-                for (let x = xOffset; x < width; x += seedSpacing) {
-                    seeds.push({ x, y });
+            for (let sy = 0; sy < height; sy += seedSpacing) {
+                const xOffset = (Math.floor(sy / seedSpacing) % 2) * (seedSpacing / 2);
+                for (let sx = xOffset; sx < width; sx += seedSpacing) {
+                    seeds.push({ x: sx, y: sy });
                 }
             }
 
-            // Randomize seed order
+            // Deterministic shuffle
             for (let i = seeds.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.abs(Math.sin(i * 12.345)) * 10000) % (i + 1);
                 [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
@@ -543,8 +570,8 @@ export class ImageHatching {
                 const startCell = getCell(startX, startY);
                 if (startCell < 0 || spatialGrid[startCell] !== 0) return;
 
-                const dens = getDensity(startX, startY);
-                if (dens >= threshold) return; // Started in empty space
+                const startDens = getDensity(startX, startY);
+                if (startDens >= threshold) return; // Started in empty space
 
                 const pts: MakerJs.IPoint[] = [];
                 const cellClaims: number[] = [];
@@ -558,6 +585,8 @@ export class ImageHatching {
                     }
 
                     if (dir === 1) currentPath.push([R(px), R(py)]);
+
+                    let prevDens = startDens;
 
                     for (let step = 0; step < 1000; step++) {
                         let flow = getTangent(px, py);
@@ -580,7 +609,7 @@ export class ImageHatching {
                             flow.vy = -flow.vy;
                         }
 
-                        // RK2 Midpoint 
+                        // RK2 Midpoint
                         const hLen = stepLen * 0.5;
                         const mx = px + flow.vx * hLen;
                         const my = py + flow.vy * hLen;
@@ -597,10 +626,13 @@ export class ImageHatching {
                         if (nx < 0 || nx > width || ny < 0 || ny > height) break;
                         const nDens = getDensity(nx, ny);
                         if (nDens >= threshold) {
-                            const t = (threshold - dens) / (nDens - dens);
-                            const edgeX = px + t * (nx - px);
-                            const edgeY = py + t * (ny - py);
-                            currentPath.push([R(edgeX), R(edgeY)]);
+                            // Interpolate exact edge point using previous step's density
+                            if (nDens !== prevDens) {
+                                const t = (threshold - prevDens) / (nDens - prevDens);
+                                const edgeX = px + t * (nx - px);
+                                const edgeY = py + t * (ny - py);
+                                currentPath.push([R(edgeX), R(edgeY)]);
+                            }
                             break;
                         }
 
@@ -630,6 +662,7 @@ export class ImageHatching {
 
                         currentPath.push([R(nx), R(ny)]);
                         px = nx; py = ny;
+                        prevDens = nDens;
 
                         const cId = getCell(px, py);
                         if (cId >= 0 && spatialGrid[cId] === 0) {
@@ -657,89 +690,98 @@ export class ImageHatching {
             }
 
             if (options.drawContour && boundary.length > 0) {
-                let contourId = 0;
-                type CStrand = MakerJs.IPoint[];
-                const strands: CStrand[] = [];
-                const usedSeg = new Set<number>();
+                emitContourLines(boundary);
+            }
+        };
 
-                for (let si = 0; si < boundary.length; si++) {
-                    if (usedSeg.has(si)) continue;
-                    usedSeg.add(si);
-                    const strand: CStrand = [[boundary[si].x1, boundary[si].y1], [boundary[si].x2, boundary[si].y2]];
-                    let extended = true;
-                    while (extended) {
-                        extended = false;
-                        const last = strand[strand.length - 1];
-                        for (let sj = 0; sj < boundary.length; sj++) {
-                            if (usedSeg.has(sj)) continue;
-                            const distToStart = Math.hypot(boundary[sj].x1 - last[0], boundary[sj].y1 - last[1]);
-                            if (distToStart < 0.01) {
-                                usedSeg.add(sj);
-                                strand.push([boundary[sj].x2, boundary[sj].y2]);
-                                extended = true;
-                                break;
-                            }
+        // ── Contour line helper ───────────────────────────────────────────────────
+        const emitContourLines = (boundary: Seg2D[]) => {
+            let contourId = 0;
+            type CStrand = MakerJs.IPoint[];
+            const strands: CStrand[] = [];
+            const usedSeg = new Set<number>();
+
+            for (let si = 0; si < boundary.length; si++) {
+                if (usedSeg.has(si)) continue;
+                usedSeg.add(si);
+                const strand: CStrand = [
+                    [boundary[si].x1, boundary[si].y1],
+                    [boundary[si].x2, boundary[si].y2]
+                ];
+                let extended = true;
+                while (extended) {
+                    extended = false;
+                    const last = strand[strand.length - 1];
+                    for (let sj = 0; sj < boundary.length; sj++) {
+                        if (usedSeg.has(sj)) continue;
+                        const distToStart = Math.hypot(boundary[sj].x1 - last[0], boundary[sj].y1 - last[1]);
+                        if (distToStart < 0.01) {
+                            usedSeg.add(sj);
+                            strand.push([boundary[sj].x2, boundary[sj].y2]);
+                            extended = true;
+                            break;
                         }
                     }
-                    strands.push(strand);
                 }
+                strands.push(strand);
+            }
 
-                for (const strand of strands) {
-                    if (strand.length >= 2) {
-                        model.models![`contour_${contourId++}`] = new MakerJs.models.ConnectTheDots(false, strand);
-                    }
+            for (const strand of strands) {
+                if (strand.length >= 2) {
+                    model.models![`contour_${contourId++}`] =
+                        new MakerJs.models.ConnectTheDots(false, strand);
                 }
             }
         };
 
-        // ── Main Execution Branch ─────────────────────────────────────────────────
+        // DEBUG: Comprehensive pixel stats
+        {
+            const ch = rawDensity.info.channels;
+            let transparent = 0, dark = 0, light = 0, total = dWidth * dHeight;
+            let minAlpha = 255, maxAlpha = 0;
+            let minR = 255, maxR = 0;
+            // Scan every 10th pixel for speed
+            for (let py = 0; py < dHeight; py += 10) {
+                for (let px = 0; px < dWidth; px += 10) {
+                    const idx = (py * dWidth + px) * ch;
+                    const r = dData[idx], g = dData[idx + 1], b = dData[idx + 2], a = dData[idx + 3];
+                    if (a < minAlpha) minAlpha = a;
+                    if (a > maxAlpha) maxAlpha = a;
+                    if (r < minR) minR = r;
+                    if (r > maxR) maxR = r;
+                    if (a === 0) transparent++;
+                    const luma = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+                    if (luma < 0.5) dark++; else light++;
+                }
+            }
+            const sampled = Math.ceil(dWidth / 10) * Math.ceil(dHeight / 10);
+            console.log(`[hatching-debug] pixel stats (sampled ${sampled} of ${total}):`);
+            console.log(`  transparent(a=0): ${transparent}, dark(luma<0.5): ${dark}, light(luma>=0.5): ${light}`);
+            console.log(`  alpha range: [${minAlpha}, ${maxAlpha}], R range: [${minR}, ${maxR}]`);
+            // Also scan the alpha channel for a row through the middle
+            const midRow = Math.floor(dHeight / 2);
+            const alphaSlice: number[] = [];
+            for (let px = 0; px < dWidth; px += Math.max(1, Math.floor(dWidth / 40))) {
+                const idx = (midRow * dWidth + px) * ch;
+                alphaSlice.push(dData[idx + 3]);
+            }
+            console.log(`  alpha along middle row (${alphaSlice.length} samples):`, alphaSlice);
+        }
+
         if (options.normalMap) {
             runStreamlineHatching();
         } else {
             const bThresh = options.contourThreshold ?? threshold;
             const boundary = buildBoundary(bThresh);
+            console.log('[hatching-debug] boundary segments:', boundary.length);
 
-            // Pass null for boundary segments to force fallback exact density scanning, 
-            // as the smoothed strand accumulator produces unclosed paths that break even-odd raycasts.
-            runRasterHatching(0, null);
+            runRasterHatching(0, boundary);
             if (options.crossHatch || (options.crossHatchChance || 0) > 0) {
-                runRasterHatching(Math.PI / 2, null);
+                runRasterHatching(Math.PI / 2, boundary);
             }
 
-            // Draw contour lines
             if (options.drawContour && boundary.length > 0) {
-                let contourId = 0;
-                type CStrand = MakerJs.IPoint[];
-                const strands: CStrand[] = [];
-                const usedSeg = new Set<number>();
-
-                for (let si = 0; si < boundary.length; si++) {
-                    if (usedSeg.has(si)) continue;
-                    usedSeg.add(si);
-                    const strand: CStrand = [[boundary[si].x1, boundary[si].y1], [boundary[si].x2, boundary[si].y2]];
-                    let extended = true;
-                    while (extended) {
-                        extended = false;
-                        const last = strand[strand.length - 1];
-                        for (let sj = 0; sj < boundary.length; sj++) {
-                            if (usedSeg.has(sj)) continue;
-                            const distToStart = Math.hypot(boundary[sj].x1 - last[0], boundary[sj].y1 - last[1]);
-                            if (distToStart < 0.01) {
-                                usedSeg.add(sj);
-                                strand.push([boundary[sj].x2, boundary[sj].y2]);
-                                extended = true;
-                                break;
-                            }
-                        }
-                    }
-                    strands.push(strand);
-                }
-
-                for (const strand of strands) {
-                    if (strand.length >= 2) {
-                        model.models![`contour_${contourId++}`] = new MakerJs.models.ConnectTheDots(false, strand);
-                    }
-                }
+                emitContourLines(boundary);
             }
         }
 
