@@ -51,11 +51,20 @@ export class ImageHatching {
         const dWidth = rawDensity.info.width;
         const dHeight = rawDensity.info.height;
 
+        let rawNormal: { data: Buffer, info: sharp.OutputInfo } | null = null;
+        if (options.normalMap) {
+            const b64Norm = options.normalMap.replace(/^data:image\/\w+;base64,/, "");
+            rawNormal = await sharp(Buffer.from(b64Norm, 'base64'))
+                .toColorspace('srgb')
+                .ensureAlpha()
+                .raw()
+                .toBuffer({ resolveWithObject: true });
+        }
+
         const userScale = options.scale ?? 1;
         const userOffsetX = options.offsetX ?? 0;
         const userOffsetY = options.offsetY ?? 0;
 
-        // "Cover" behavior: scale so the image fills the bounding box completely
         const baseScale = Math.max(width / dWidth, height / dHeight);
         const scale = baseScale * userScale;
 
@@ -117,6 +126,50 @@ export class ImageHatching {
                 + s10 * tx * (1 - ty)
                 + s01 * (1 - tx) * ty
                 + s11 * tx * ty;
+        };
+
+        // ── Normal Map Tangent Sampling ─────────────────────────────────────────
+        const getTangent = (x: number, y: number): { vx: number, vy: number } | null => {
+            if (!rawNormal) return null;
+            const fx = (x - startX) / scale;
+            const fy = (startY + imgH - y) / scale;
+
+            // Outside image bounds â†’ flow straight horizontally as fallback
+            if (fx < -0.5 || fx >= dWidth - 0.5 || fy < -0.5 || fy >= dHeight - 0.5) return null;
+
+            const applyFlipX = (px: number) => options.flipX ? (dWidth - 1) - px : px;
+            const applyFlipY = (py: number) => options.flipY ? (dHeight - 1) - py : py;
+
+            const bx = applyFlipX(Math.max(0, Math.min(dWidth - 1, Math.round(fx))));
+            const by = applyFlipY(Math.max(0, Math.min(dHeight - 1, Math.round(fy))));
+
+            const nChannels = rawNormal.info.channels;
+            const idx = (by * dWidth + bx) * nChannels;
+
+            // R: X-axis (-1 left to 1 right)
+            // G: Y-axis (-1 down to 1 up)
+            // B: Z-axis (forward)
+            const r = rawNormal.data[idx];
+            const g = rawNormal.data[idx + 1];
+
+            // Remap [0, 255] to [-1.0, 1.0]
+            // Standard normal map: R=128, G=128 is "flat" (facing camera)
+            const nx = (r / 255) * 2.0 - 1.0;
+            // IMPORTANT: Normal map G channel conventions vary (DirectX vs OpenGL).
+            // Usually Y goes *up*, but image coords go down. We assume standard +Y=Up.
+            let ny = (g / 255) * 2.0 - 1.0;
+            if (options.flipY) ny = -ny; // User flip might affect normal direction
+
+            // The surface normal is (nx, ny, nz).
+            // To hatch *along* the surface, we want a tangent.
+            // Rotating the XY normal vector by 90Â° gives a tangent flow direction: [-ny, nx].
+            let tx = -ny;
+            let ty = nx;
+
+            const len = Math.hypot(tx, ty);
+            if (len < 0.001) return null; // Flat area: fallback
+
+            return { vx: tx / len, vy: ty / len };
         };
 
         const baseAngleRad = (options.baseAngle || 45) * Math.PI / 180;
