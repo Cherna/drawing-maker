@@ -187,12 +187,12 @@ export class ImageHatching {
         // <1 = more lines in dark areas (emphasises darks), >1 = sparsely spaced (emphasises lights)
         const densityCurve = Math.max(0.1, options.densityCurve ?? 1.0);
 
-        // â”€â”€ Shared Boundary Segments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // -------------------------------------------------------------------------
         // buildBoundary() runs the strand-accumulation contour scan, applies smoothing,
         // and returns a flat list of [x1,y1,x2,y2] segments in world (canvas) space.
         // These are used both for drawing the contour line AND for clipping hatch lines,
         // so both operations share exactly the same clean edge.
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // -------------------------------------------------------------------------
         interface Seg2D { x1: number; y1: number; x2: number; y2: number; }
 
         const buildBoundary = (bThresh: number): Seg2D[] => {
@@ -271,20 +271,20 @@ export class ImageHatching {
             return resultSegs;
         };
 
-        // â”€â”€ Scan-line Ã— boundary intersection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // -------------------------------------------------------------------------
         // For a scan line at perpendicular offset y (in rotated frame), direction cosA/sinA,
         // find all x-parameters along the scan line where it crosses boundary segment seg.
         //
-        // Scan point at param x: world = (cx + xÂ·cosA âˆ’ yÂ·sinA,  cy + xÂ·sinA + yÂ·cosA)
-        // Segment from A to B:   world = A + tÂ·(Bâˆ’A),  t âˆˆ [0,1]
+        // Scan point at param x: world = (cx + x * cosA - y * sinA,  cy + x * sinA + y * cosA)
+        // Segment from A to B:   world = A + t * (B - A),  t in [0,1]
         //
-        // 2Ã—2 system (Cramer's rule):
-        //   xÂ·cosA âˆ’ tÂ·ddx = rx    where rx = Ax âˆ’ cx + yÂ·sinA
-        //   xÂ·sinA âˆ’ tÂ·ddy = ry          ry = Ay âˆ’ cy âˆ’ yÂ·cosA
-        //   det = ddxÂ·sinA âˆ’ cosAÂ·ddy
-        //   x   = (âˆ’rxÂ·ddy + ryÂ·ddx) / det
-        //   t   = ( cosAÂ·ry âˆ’ sinAÂ·rx) / det
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // 2x2 system (Cramer's rule):
+        //   x * cosA - t * ddx = rx    where rx = Ax - cx + y * sinA
+        //   x * sinA - t * ddy = ry          ry = Ay - cy - y * cosA
+        //   det = ddx * sinA - cosA * ddy
+        //   x   = (-rx * ddy + ry * ddx) / det
+        //   t   = ( cosA * ry - sinA * rx) / det
+        // -------------------------------------------------------------------------
         const hatchClipXValues = (
             cx: number, cy: number,
             cosA: number, sinA: number,
@@ -496,55 +496,249 @@ export class ImageHatching {
             }
         };
 
-        // â”€â”€ Build boundary, run hatching, optionally draw contour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        const bThresh = options.contourThreshold ?? threshold;
-        const boundary = buildBoundary(bThresh);
+        // ── Streamline Hatching (Normal Map Driven) ─────────────────────────────
+        const runStreamlineHatching = () => {
+            const stepLen = 0.5; // mm per integration step
+            const maxRadius = Math.hypot(width, height) / 2;
+            const cx = width / 2;
+            const cy = height / 2;
 
-        runRasterHatching(0, boundary);
-        if (options.crossHatch || (options.crossHatchChance || 0) > 0) {
-            runRasterHatching(Math.PI / 2, boundary);
-        }
+            const bThresh = options.contourThreshold ?? threshold;
+            const boundary = buildBoundary(bThresh);
 
-        // Draw contour lines by emitting the boundary segments into the model
-        if (options.drawContour && boundary.length > 0) {
-            let contourId = 0;
-            // Re-run strand accumulation on raw segments to emit as polylines
-            // (the boundary segs are already smoothed, so just chain consecutive ones)
-            // Group segments into polylines by proximity
-            type CStrand = MakerJs.IPoint[];
-            const strands: CStrand[] = [];
-            const usedSeg = new Set<number>();
+            // Spatial density tracking via a coarse grid
+            // Grid cell size matches the minSpacing we want in the darkest areas.
+            const cellSize = minSpacing / 2;
+            const gridCols = Math.ceil(width / cellSize);
+            const gridRows = Math.ceil(height / cellSize);
+            const spatialGrid = new Int8Array(gridCols * gridRows);
 
-            for (let si = 0; si < boundary.length; si++) {
-                if (usedSeg.has(si)) continue;
-                usedSeg.add(si);
-                const strand: CStrand = [
-                    [boundary[si].x1, boundary[si].y1],
-                    [boundary[si].x2, boundary[si].y2]
-                ];
-                // Chain segments that share endpoints
-                let extended = true;
-                while (extended) {
-                    extended = false;
-                    const last = strand[strand.length - 1];
-                    for (let sj = 0; sj < boundary.length; sj++) {
-                        if (usedSeg.has(sj)) continue;
-                        const distToStart = Math.hypot(boundary[sj].x1 - last[0], boundary[sj].y1 - last[1]);
-                        if (distToStart < 0.01) {
-                            usedSeg.add(sj);
-                            strand.push([boundary[sj].x2, boundary[sj].y2]);
-                            extended = true;
-                            break;
-                        }
-                    }
+            const getCell = (x: number, y: number) => {
+                const c = Math.floor(x / cellSize);
+                const r = Math.floor(y / cellSize);
+                if (c < 0 || c >= gridCols || r < 0 || r >= gridRows) return -1;
+                return r * gridCols + c;
+            };
+
+            let lineIdCounter = 0;
+            const R = (v: number) => Math.round(v * 1000) / 1000;
+
+            // Generate seed points on a grid across the canvas
+            const seeds: { x: number, y: number }[] = [];
+            const seedSpacing = minSpacing;
+            for (let y = 0; y < height; y += seedSpacing) {
+                const xOffset = (Math.floor(y / seedSpacing) % 2) * (seedSpacing / 2);
+                for (let x = xOffset; x < width; x += seedSpacing) {
+                    seeds.push({ x, y });
                 }
-                strands.push(strand);
             }
 
-            for (const strand of strands) {
-                if (strand.length >= 2) {
-                    model.models![`contour_${contourId++}`] =
-                        new MakerJs.models.ConnectTheDots(false, strand);
+            // Randomize seed order
+            for (let i = seeds.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.abs(Math.sin(i * 12.345)) * 10000) % (i + 1);
+                [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
+            }
+
+            const traceStreamline = (startX: number, startY: number) => {
+                const startCell = getCell(startX, startY);
+                if (startCell < 0 || spatialGrid[startCell] !== 0) return;
+
+                const dens = getDensity(startX, startY);
+                if (dens >= threshold) return; // Started in empty space
+
+                const pts: MakerJs.IPoint[] = [];
+                const cellClaims: number[] = [];
+
+                for (const dir of [1, -1]) {
+                    let px = startX;
+                    let py = startY;
+                    let currentPath: MakerJs.IPoint[] = [];
+                    if (dir === -1 && pts.length > 0) {
+                        pts.reverse();
+                    }
+
+                    if (dir === 1) currentPath.push([R(px), R(py)]);
+
+                    for (let step = 0; step < 1000; step++) {
+                        let flow = getTangent(px, py);
+
+                        if (!flow) {
+                            flow = { vx: Math.cos(baseAngleRad), vy: Math.sin(baseAngleRad) };
+                        }
+
+                        if (currentPath.length > 1) {
+                            const lastP = currentPath[currentPath.length - 1];
+                            const prevP = currentPath[currentPath.length - 2];
+                            const vpx = lastP[0] - prevP[0];
+                            const vpy = lastP[1] - prevP[1];
+                            if (flow.vx * vpx + flow.vy * vpy < 0) {
+                                flow.vx = -flow.vx;
+                                flow.vy = -flow.vy;
+                            }
+                        } else if (dir === -1) {
+                            flow.vx = -flow.vx;
+                            flow.vy = -flow.vy;
+                        }
+
+                        // RK2 Midpoint 
+                        const hLen = stepLen * 0.5;
+                        const mx = px + flow.vx * hLen;
+                        const my = py + flow.vy * hLen;
+
+                        let flowMid = getTangent(mx, my);
+                        if (!flowMid) flowMid = { vx: Math.cos(baseAngleRad), vy: Math.sin(baseAngleRad) };
+                        if (flowMid.vx * flow.vx + flowMid.vy * flow.vy < 0) {
+                            flowMid.vx = -flowMid.vx; flowMid.vy = -flowMid.vy;
+                        }
+
+                        const nx = px + flowMid.vx * stepLen;
+                        const ny = py + flowMid.vy * stepLen;
+
+                        if (nx < 0 || nx > width || ny < 0 || ny > height) break;
+                        const nDens = getDensity(nx, ny);
+                        if (nDens >= threshold) {
+                            const t = (threshold - dens) / (nDens - dens);
+                            const edgeX = px + t * (nx - px);
+                            const edgeY = py + t * (ny - py);
+                            currentPath.push([R(edgeX), R(edgeY)]);
+                            break;
+                        }
+
+                        const darkness = 1.0 - nDens;
+                        let nd = Math.max(0, darkness - (1.0 - threshold)) / threshold;
+                        nd = Math.min(1.0, nd);
+                        const bi = Math.floor(nd * (steps - 0.001));
+
+                        const tB = steps > 1 ? bi / (steps - 1) : 1;
+                        const tC = Math.pow(tB, densityCurve);
+                        const reqClearance = Math.max(1, Math.round(periodMax * (1 - tC) + periodMin * tC));
+
+                        let collision = false;
+                        for (let dy = -reqClearance; dy <= reqClearance; dy++) {
+                            for (let dx = -reqClearance; dx <= reqClearance; dx++) {
+                                if (dx * dx + dy * dy <= reqClearance * reqClearance) {
+                                    const cell = getCell(nx + dx * cellSize, ny + dy * cellSize);
+                                    if (cell >= 0 && spatialGrid[cell] !== 0 && !cellClaims.includes(cell)) {
+                                        collision = true; break;
+                                    }
+                                }
+                            }
+                            if (collision) break;
+                        }
+
+                        if (collision) break;
+
+                        currentPath.push([R(nx), R(ny)]);
+                        px = nx; py = ny;
+
+                        const cId = getCell(px, py);
+                        if (cId >= 0 && spatialGrid[cId] === 0) {
+                            spatialGrid[cId] = 1;
+                            cellClaims.push(cId);
+                        }
+                    }
+
+                    if (dir === 1) {
+                        pts.push(...currentPath);
+                    } else {
+                        pts.unshift(...currentPath.reverse().slice(0, -1));
+                    }
+                }
+
+                if (pts.length > 2) {
+                    model.models![`hatch_stream_${lineIdCounter++}`] = new MakerJs.models.ConnectTheDots(false, pts);
+                } else {
+                    for (const c of cellClaims) spatialGrid[c] = 0;
+                }
+            };
+
+            for (const s of seeds) {
+                traceStreamline(s.x, s.y);
+            }
+
+            if (options.drawContour && boundary.length > 0) {
+                let contourId = 0;
+                type CStrand = MakerJs.IPoint[];
+                const strands: CStrand[] = [];
+                const usedSeg = new Set<number>();
+
+                for (let si = 0; si < boundary.length; si++) {
+                    if (usedSeg.has(si)) continue;
+                    usedSeg.add(si);
+                    const strand: CStrand = [[boundary[si].x1, boundary[si].y1], [boundary[si].x2, boundary[si].y2]];
+                    let extended = true;
+                    while (extended) {
+                        extended = false;
+                        const last = strand[strand.length - 1];
+                        for (let sj = 0; sj < boundary.length; sj++) {
+                            if (usedSeg.has(sj)) continue;
+                            const distToStart = Math.hypot(boundary[sj].x1 - last[0], boundary[sj].y1 - last[1]);
+                            if (distToStart < 0.01) {
+                                usedSeg.add(sj);
+                                strand.push([boundary[sj].x2, boundary[sj].y2]);
+                                extended = true;
+                                break;
+                            }
+                        }
+                    }
+                    strands.push(strand);
+                }
+
+                for (const strand of strands) {
+                    if (strand.length >= 2) {
+                        model.models![`contour_${contourId++}`] = new MakerJs.models.ConnectTheDots(false, strand);
+                    }
+                }
+            }
+        };
+
+        // ── Main Execution Branch ─────────────────────────────────────────────────
+        if (options.normalMap) {
+            runStreamlineHatching();
+        } else {
+            const bThresh = options.contourThreshold ?? threshold;
+            const boundary = buildBoundary(bThresh);
+
+            // Pass null for boundary segments to force fallback exact density scanning, 
+            // as the smoothed strand accumulator produces unclosed paths that break even-odd raycasts.
+            runRasterHatching(0, null);
+            if (options.crossHatch || (options.crossHatchChance || 0) > 0) {
+                runRasterHatching(Math.PI / 2, null);
+            }
+
+            // Draw contour lines
+            if (options.drawContour && boundary.length > 0) {
+                let contourId = 0;
+                type CStrand = MakerJs.IPoint[];
+                const strands: CStrand[] = [];
+                const usedSeg = new Set<number>();
+
+                for (let si = 0; si < boundary.length; si++) {
+                    if (usedSeg.has(si)) continue;
+                    usedSeg.add(si);
+                    const strand: CStrand = [[boundary[si].x1, boundary[si].y1], [boundary[si].x2, boundary[si].y2]];
+                    let extended = true;
+                    while (extended) {
+                        extended = false;
+                        const last = strand[strand.length - 1];
+                        for (let sj = 0; sj < boundary.length; sj++) {
+                            if (usedSeg.has(sj)) continue;
+                            const distToStart = Math.hypot(boundary[sj].x1 - last[0], boundary[sj].y1 - last[1]);
+                            if (distToStart < 0.01) {
+                                usedSeg.add(sj);
+                                strand.push([boundary[sj].x2, boundary[sj].y2]);
+                                extended = true;
+                                break;
+                            }
+                        }
+                    }
+                    strands.push(strand);
+                }
+
+                for (const strand of strands) {
+                    if (strand.length >= 2) {
+                        model.models![`contour_${contourId++}`] = new MakerJs.models.ConnectTheDots(false, strand);
+                    }
                 }
             }
         }
