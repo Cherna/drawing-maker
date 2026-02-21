@@ -240,21 +240,6 @@ export class ImageHatching {
         const threshold = options.threshold ?? 0.95;
         const densityMultiplier = Math.max(0.1, options.density || 1.5);
 
-        // Continuous density subdivision: bit-reversed fractional mapping [0, 1]
-        // This generates a Halton-style Van der Corput sequence.
-        // E.g., line 1 -> 0.5, line 2 -> 0.25, line 3 -> 0.75, line 4 -> 0.125
-        const getLineScore = (index: number): number => {
-            let n = index + 1; // 1-indexed to avoid 0 mapping to 0 for the first line
-            let rev = 0;
-            let p = 0.5;
-            while (n > 0) {
-                if (n % 2 === 1) rev += p;
-                p *= 0.5;
-                n = Math.floor(n / 2);
-            }
-            return rev;
-        };
-
         // Number of discrete grey values steps mapping limits
         const steps = Math.floor(Math.max(1, options.shadingSteps || 5));
 
@@ -450,7 +435,7 @@ export class ImageHatching {
                         if (inBounds && dens < threshold && (hasTransparency ? alpha >= 0.5 : true)) {
                             const darkness = 1.0 - dens;
                             let normalizedDarkness = Math.max(0, darkness - (1.0 - threshold)) / threshold;
-                            normalizedDarkness = Math.min(1.0, normalizedDarkness);
+                            normalizedDarkness = Math.min(1.0, Math.pow(normalizedDarkness, densityCurve));
                             const bucketIndex = Math.floor(normalizedDarkness * (steps - 0.001));
 
                             let isSwitched = false;
@@ -466,11 +451,8 @@ export class ImageHatching {
                             else shouldDrawPass = isAltPass ? isSwitched : !isSwitched;
 
                             if (shouldDrawPass) {
-                                const tBucket = steps > 1 ? bucketIndex / (steps - 1) : 1;
-                                const tCurved = Math.pow(tBucket, densityCurve);
-
-                                // Compare directly against continuous density score to avoid artificial banding
-                                if (getLineScore(lineIndex) < tCurved) {
+                                const spacing = 1 << Math.max(0, (steps - 1 - bucketIndex));
+                                if (lineIndex % spacing === 0) {
                                     draw = true;
                                 }
                             }
@@ -543,7 +525,7 @@ export class ImageHatching {
                         if (inBounds && dens < threshold && (hasTransparency ? alpha >= 0.5 : true)) {
                             const darkness = 1.0 - dens;
                             let nd = Math.max(0, darkness - (1.0 - threshold)) / threshold;
-                            nd = Math.min(1.0, nd);
+                            nd = Math.min(1.0, Math.pow(nd, densityCurve));
                             const bi = Math.floor(nd * (steps - 0.001));
                             let sw = false;
                             const ch = options.crossHatchChance || 0;
@@ -552,10 +534,8 @@ export class ImageHatching {
                             const alt = Math.abs(angleOffset) > 0.01;
                             if (options.crossHatch) sdp = true; else sdp = alt ? sw : !sw;
                             if (sdp) {
-                                const tB = steps > 1 ? bi / (steps - 1) : 1;
-                                const tC = Math.pow(tB, densityCurve);
-
-                                if (getLineScore(lineIndex) < tC) {
+                                const spacing = 1 << Math.max(0, (steps - 1 - bi));
+                                if (lineIndex % spacing === 0) {
                                     draw = true;
                                 }
                             }
@@ -644,11 +624,10 @@ export class ImageHatching {
                 const getClearanceForDensity = (dens: number): number => {
                     const darkness = 1.0 - dens;
                     let nd = Math.max(0, darkness - (1.0 - threshold)) / threshold;
-                    nd = Math.min(1.0, nd);
+                    nd = Math.min(1.0, Math.pow(nd, densityCurve));
                     const bi = Math.floor(nd * (steps - 0.001));
-                    const tB = steps > 1 ? bi / (steps - 1) : 1;
-                    const densityVal = Math.pow(tB, densityCurve);
-                    return Math.max(1, Math.round(1.0 / Math.max(0.01, densityVal)));
+                    const spacing = 1 << Math.max(0, (steps - 1 - bi));
+                    return Math.min(10, spacing * 2);
                 };
 
                 const startClearance = getClearanceForDensity(startDens);

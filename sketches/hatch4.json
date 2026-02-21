@@ -31,8 +31,8 @@
           {
             "tool": "image-hatching",
             "params": {
-              "shadingSteps": 10,
-              "density": 2,
+              "shadingSteps": 5,
+              "density": 3.2,
               "baseAngle": 18,
               "crossHatch": false,
               "threshold": 0.85,
@@ -62,8 +62,8 @@
       {
         "tool": "image-hatching",
         "params": {
-          "shadingSteps": 10,
-          "density": 2,
+          "shadingSteps": 5,
+          "density": 3.2,
           "baseAngle": 18,
           "crossHatch": false,
           "threshold": 0.85,
