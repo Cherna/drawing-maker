@@ -469,18 +469,8 @@ export class ImageHatching {
                                 const tBucket = steps > 1 ? bucketIndex / (steps - 1) : 1;
                                 const tCurved = Math.pow(tBucket, densityCurve);
 
-                                // Map the brightness curve to an absolute fractional probability 0.0->1.0
-                                const densityVal = tCurved;
-
-                                // Quantize the density into discrete power-of-2 bands so that 
-                                // the Van der Corput sequence cleanly fills spacing uniformly.
-                                // Valid thresholds: 1, 0.5, 0.25, 0.125, etc.
-                                const currentDensityThreshold = densityVal >= 0.99 ? 1.0 :
-                                    densityVal <= 0.01 ? 0.0 :
-                                        Math.pow(0.5, Math.max(0, Math.floor(Math.log2(1.0 / densityVal))));
-
-                                // If the unique fractal line score falls under the threshold, we draw it!
-                                if (getLineScore(lineIndex) < currentDensityThreshold) {
+                                // Compare directly against continuous density score to avoid artificial banding
+                                if (getLineScore(lineIndex) < tCurved) {
                                     draw = true;
                                 }
                             }
@@ -565,14 +555,7 @@ export class ImageHatching {
                                 const tB = steps > 1 ? bi / (steps - 1) : 1;
                                 const tC = Math.pow(tB, densityCurve);
 
-                                const densityVal = tC;
-
-                                // Quantize the density into discrete power-of-2 bands
-                                const currentDensityThreshold = densityVal >= 0.99 ? 1.0 :
-                                    densityVal <= 0.01 ? 0.0 :
-                                        Math.pow(0.5, Math.max(0, Math.floor(Math.log2(1.0 / densityVal))));
-
-                                if (getLineScore(lineIndex) < currentDensityThreshold) {
+                                if (getLineScore(lineIndex) < tC) {
                                     draw = true;
                                 }
                             }
@@ -654,16 +637,35 @@ export class ImageHatching {
             }
 
             const traceStreamline = (startX: number, startY: number, lineId: number) => {
-                const startCell = getCell(startX, startY);
-                if (startCell < 0 || spatialGrid[startCell] !== 0) return;
-
                 const startDens = getDensity(startX, startY);
                 const startAlpha = getAlpha(startX, startY);
                 if (startDens >= threshold || (hasTransparency && startAlpha < 0.5)) return; // Started in empty space
 
+                const getClearanceForDensity = (dens: number): number => {
+                    const darkness = 1.0 - dens;
+                    let nd = Math.max(0, darkness - (1.0 - threshold)) / threshold;
+                    nd = Math.min(1.0, nd);
+                    const bi = Math.floor(nd * (steps - 0.001));
+                    const tB = steps > 1 ? bi / (steps - 1) : 1;
+                    const densityVal = Math.pow(tB, densityCurve);
+                    return Math.max(1, Math.round(1.0 / Math.max(0.01, densityVal)));
+                };
+
+                const startClearance = getClearanceForDensity(startDens);
+                let collStart = false;
+                for (let dy = -startClearance; dy <= startClearance; dy++) {
+                    for (let dx = -startClearance; dx <= startClearance; dx++) {
+                        if (dx * dx + dy * dy <= startClearance * startClearance) {
+                            const c = getCell(startX + dx * cellSize, startY + dy * cellSize);
+                            if (c >= 0 && spatialGrid[c] !== 0) { collStart = true; break; }
+                        }
+                    }
+                    if (collStart) break;
+                }
+                if (collStart) return;
+
                 const pts: MakerJs.IPoint[] = [];
                 const cellClaims: number[] = [];
-                const lineScore = getLineScore(lineId);
 
                 for (const dir of [1, -1]) {
                     let px = startX;
@@ -733,23 +735,9 @@ export class ImageHatching {
                             break;
                         }
 
-                        const darkness = 1.0 - nDens;
-                        let nd = Math.max(0, darkness - (1.0 - threshold)) / threshold;
-                        nd = Math.min(1.0, nd);
-                        const bi = Math.floor(nd * (steps - 0.001));
-
-                        const tB = steps > 1 ? bi / (steps - 1) : 1;
-                        const tC = Math.pow(tB, densityCurve);
-
-                        const densityVal = Math.pow(tB, densityCurve);
-
-                        // Quantize the density into discrete power-of-2 bands
-                        const currentDensityThreshold = densityVal >= 0.99 ? 1.0 :
-                            densityVal <= 0.01 ? 0.0 :
-                                Math.pow(0.5, Math.max(0, Math.floor(Math.log2(1.0 / densityVal))));
+                        const reqClearance = getClearanceForDensity(nDens);
 
                         let collision = false;
-                        const reqClearance = 1; // Enforce minimum 1 grid cell spacing for structural integrity of vectors
                         for (let dy = -reqClearance; dy <= reqClearance; dy++) {
                             for (let dx = -reqClearance; dx <= reqClearance; dx++) {
                                 if (dx * dx + dy * dy <= reqClearance * reqClearance) {
@@ -762,18 +750,9 @@ export class ImageHatching {
                             if (collision) break;
                         }
 
-                        if (collision) break; // End streamline permanently to avoid overlapping existing lines
+                        if (collision) break;
 
-                        // We still trace the spatial tracking grid so other lines don't collide here,
-                        // but we ONLY actively draw the vertex if its density score allows.
-                        // If it doesn't allow, we add a NaN break to force drawing a separate segment.
-                        if (lineScore < currentDensityThreshold) {
-                            currentPath.push([R(nx), R(ny)]);
-                        } else {
-                            if (currentPath.length > 0 && !isNaN(currentPath[currentPath.length - 1][0])) {
-                                currentPath.push([NaN, NaN]);
-                            }
-                        }
+                        currentPath.push([R(nx), R(ny)]);
 
                         px = nx; py = ny;
                         prevDens = nDens;
@@ -794,21 +773,7 @@ export class ImageHatching {
                 }
 
                 if (pts.length > 2) {
-                    // Split the path by NaN breaks and emit sub-paths
-                    let currentSubPath: MakerJs.IPoint[] = [];
-                    for (const pt of pts) {
-                        if (isNaN(pt[0])) {
-                            if (currentSubPath.length > 1) {
-                                model.models![`hatch_stream_${lineIdCounter++}`] = new MakerJs.models.ConnectTheDots(false, currentSubPath);
-                            }
-                            currentSubPath = [];
-                        } else {
-                            currentSubPath.push(pt);
-                        }
-                    }
-                    if (currentSubPath.length > 1) {
-                        model.models![`hatch_stream_${lineIdCounter++}`] = new MakerJs.models.ConnectTheDots(false, currentSubPath);
-                    }
+                    model.models![`hatch_stream_${lineIdCounter++}`] = new MakerJs.models.ConnectTheDots(false, pts);
                 } else {
                     for (const c of cellClaims) spatialGrid[c] = 0;
                 }
