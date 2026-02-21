@@ -36,22 +36,6 @@ export class ImageHatching {
 
         const base64Data = options.densityMap.replace(/^data:image\/[^;]+;base64,/, "");
         const imageBuffer = Buffer.from(base64Data, 'base64');
-        // DEBUG: Check the data URL prefix and buffer metadata
-        const dataUrlPrefix = options.densityMap.substring(0, 80);
-        console.log('[hatching-debug] densityMap data URL prefix:', dataUrlPrefix);
-        console.log('[hatching-debug] imageBuffer length:', imageBuffer.length);
-        // Check what sharp thinks the input format is
-        const inputMeta = await sharp(imageBuffer).metadata();
-        console.log('[hatching-debug] sharp metadata:', JSON.stringify({
-            format: inputMeta.format,
-            width: inputMeta.width,
-            height: inputMeta.height,
-            channels: inputMeta.channels,
-            hasAlpha: inputMeta.hasAlpha,
-            space: inputMeta.space,
-            depth: inputMeta.depth,
-            density: inputMeta.density
-        }));
         // Do NOT call .grayscale() here — it strips the alpha channel before ensureAlpha()
         // can preserve it, causing transparent pixels to become opaque black.
         // Grayscale is computed manually via the luma formula in getDensity().
@@ -89,6 +73,56 @@ export class ImageHatching {
 
         const startX = (width - imgW) / 2 + (userOffsetX * width / 100);
         const startY = (height - imgH) / 2 + (userOffsetY * height / 100);
+
+        let hasTransparency = false;
+        {
+            const ch = rawDensity.info.channels;
+            let minAlpha = 255;
+            for (let py = 0; py < dHeight; py += 10) {
+                for (let px = 0; px < dWidth; px += 10) {
+                    const idx = (py * dWidth + px) * ch;
+                    if (ch >= 4) {
+                        const a = dData[idx + 3];
+                        if (a < minAlpha) minAlpha = a;
+                    } else if (ch === 2) {
+                        const a = dData[idx + 1];
+                        if (a < minAlpha) minAlpha = a;
+                    }
+                }
+            }
+            if (minAlpha < 255) hasTransparency = true;
+        }
+
+        const getAlpha = (x: number, y: number): number => {
+            if (!hasTransparency) return 1.0;
+            const fx = (x - startX) / scale;
+            const fy = (startY + imgH - y) / scale;
+
+            if (fx < -0.5 || fx >= dWidth - 0.5 || fy < -0.5 || fy >= dHeight - 0.5) return 0.0;
+
+            const applyFlipX = (px: number) => options.flipX ? (dWidth - 1) - px : px;
+            const applyFlipY = (py: number) => options.flipY ? (dHeight - 1) - py : py;
+
+            const sampleAlpha = (px: number, py: number): number => {
+                const bx = applyFlipX(Math.max(0, Math.min(dWidth - 1, px)));
+                const by = applyFlipY(Math.max(0, Math.min(dHeight - 1, py)));
+                const channels = rawDensity.info.channels;
+                const idx = (by * dWidth + bx) * channels;
+                if (channels >= 4) return dData[idx + 3] / 255;
+                if (channels === 2) return dData[idx + 1] / 255;
+                return 1.0;
+            };
+
+            const x0 = Math.floor(fx);
+            const y0 = Math.floor(fy);
+            const tx = fx - x0;
+            const ty = fy - y0;
+
+            return sampleAlpha(x0, y0) * (1 - tx) * (1 - ty)
+                + sampleAlpha(x0 + 1, y0) * tx * (1 - ty)
+                + sampleAlpha(x0, y0 + 1) * (1 - tx) * ty
+                + sampleAlpha(x0 + 1, y0 + 1) * tx * ty;
+        };
 
         // Bilinear interpolation for smooth anti-aliased edges
         const getDensity = (x: number, y: number): number => {
@@ -228,78 +262,68 @@ export class ImageHatching {
         interface Seg2D { x1: number; y1: number; x2: number; y2: number; }
 
         const buildBoundary = (bThresh: number): Seg2D[] => {
-            const cSpacingY = minSpacing * 0.4;
-            const cStepX = 0.25;
-            const maxGap = Math.max(cSpacingY * 8, 3.0);
-
-            type Strand = { pts: MakerJs.IPoint[] };
-            let activeStrands: Strand[] = [];
-
-            // Smooth weights [1,2,4,2,1]/10
-            const smW = [1, 2, 4, 2, 1];
-            const smWsum = 10;
-
-            const smoothPts = (pts: MakerJs.IPoint[]): MakerJs.IPoint[] =>
-                pts.map((_, i) => {
-                    let sx = 0, sy = 0;
-                    for (let k = -2; k <= 2; k++) {
-                        const j = Math.max(0, Math.min(pts.length - 1, i + k));
-                        sx += pts[j][0] * smW[k + 2];
-                        sy += pts[j][1] * smW[k + 2];
-                    }
-                    return [sx / smWsum, sy / smWsum] as MakerJs.IPoint;
-                });
-
+            const step = Math.max(0.5, minSpacing * 0.5);
             const resultSegs: Seg2D[] = [];
 
-            const flushStrand = (s: Strand) => {
-                if (s.pts.length < 2) return;
-                const sm = smoothPts(s.pts);
-                for (let i = 0; i < sm.length - 1; i++) {
-                    resultSegs.push({ x1: sm[i][0], y1: sm[i][1], x2: sm[i + 1][0], y2: sm[i + 1][1] });
+            const numCols = Math.ceil(width / step) + 1;
+            const numRows = Math.ceil(height / step) + 1;
+            const grid = new Float32Array(numCols * numRows);
+
+            for (let r = 0; r < numRows; r++) {
+                const y = r * step;
+                for (let c = 0; c < numCols; c++) {
+                    const x = c * step;
+                    let v = -1;
+                    if (x >= 0 && x <= width && y >= 0 && y <= height) {
+                        if (hasTransparency) {
+                            v = getAlpha(x, y) - 0.5;
+                        } else {
+                            v = bThresh - getDensity(x, y);
+                        }
+                    }
+                    if (v === 0) v = 1e-9;
+                    grid[r * numCols + c] = v;
                 }
+            }
+
+            const getV = (c: number, r: number) => grid[r * numCols + c];
+
+            const interp = (xA: number, yA: number, xB: number, yB: number, vA: number, vB: number) => {
+                const t = vA / (vA - vB);
+                return { x: xA + t * (xB - xA), y: yA + t * (yB - yA) };
             };
 
-            for (let sy = 0; sy <= height; sy += cSpacingY) {
-                const rowCrossings: MakerJs.IPoint[] = [];
-                let prevD = 1.0, prevPx = 0.0;
+            const edgesTbl = [
+                [], [[3, 0]], [[0, 1]], [[3, 1]],
+                [[1, 2]], [[3, 0], [1, 2]], [[0, 2]], [[3, 2]],
+                [[2, 3]], [[2, 0]], [[0, 1], [2, 3]], [[2, 1]],
+                [[1, 3]], [[1, 0]], [[0, 3]], []
+            ];
 
-                for (let sx = 0; sx <= width; sx += cStepX) {
-                    const d = getDensity(sx, sy);
-                    if ((prevD >= bThresh) !== (d >= bThresh) && d !== prevD) {
-                        const t = (bThresh - prevD) / (d - prevD);
-                        rowCrossings.push([prevPx + t * cStepX, sy]);
-                    }
-                    prevD = d; prevPx = sx;
-                }
+            for (let r = 0; r < numRows - 1; r++) {
+                for (let c = 0; c < numCols - 1; c++) {
+                    const x = c * step; const y = r * step;
+                    const v0 = getV(c, r); const v1 = getV(c + 1, r);
+                    const v2 = getV(c + 1, r + 1); const v3 = getV(c, r + 1);
 
-                const matchedStrand = new Set<number>();
-                const matchedCross = new Set<number>();
-                const nextStrands: Strand[] = [];
+                    const state = (v0 > 0 ? 1 : 0) | (v1 > 0 ? 2 : 0) | (v2 > 0 ? 4 : 0) | (v3 > 0 ? 8 : 0);
+                    if (state === 0 || state === 15) continue;
 
-                for (let si = 0; si < activeStrands.length; si++) {
-                    const lastPt = activeStrands[si].pts[activeStrands[si].pts.length - 1];
-                    let bestDist = maxGap, bestCi = -1;
-                    for (let ci = 0; ci < rowCrossings.length; ci++) {
-                        if (matchedCross.has(ci)) continue;
-                        const dist = Math.abs(rowCrossings[ci][0] - lastPt[0]);
-                        if (dist < bestDist) { bestDist = dist; bestCi = ci; }
+                    const pts = [
+                        interp(x, y, x + step, y, v0, v1),
+                        interp(x + step, y, x + step, y + step, v1, v2),
+                        interp(x, y + step, x + step, y + step, v3, v2),
+                        interp(x, y, x, y + step, v0, v3)
+                    ];
+
+                    for (const edge of edgesTbl[state]) {
+                        resultSegs.push({
+                            x1: pts[edge[0]].x, y1: pts[edge[0]].y,
+                            x2: pts[edge[1]].x, y2: pts[edge[1]].y
+                        });
                     }
-                    if (bestCi >= 0) {
-                        matchedStrand.add(si); matchedCross.add(bestCi);
-                        activeStrands[si].pts.push(rowCrossings[bestCi]);
-                        nextStrands.push(activeStrands[si]);
-                    }
                 }
-                for (let si = 0; si < activeStrands.length; si++) {
-                    if (!matchedStrand.has(si)) flushStrand(activeStrands[si]);
-                }
-                for (let ci = 0; ci < rowCrossings.length; ci++) {
-                    if (!matchedCross.has(ci)) nextStrands.push({ pts: [rowCrossings[ci]] });
-                }
-                activeStrands = nextStrands;
             }
-            for (const s of activeStrands) flushStrand(s);
             return resultSegs;
         };
 
@@ -332,7 +356,7 @@ export class ImageHatching {
                 const rx = seg.x1 - cx + y * sinA;
                 const ry = seg.y1 - cy - y * cosA;
                 const tSeg = (cosA * ry - sinA * rx) / det;
-                if (tSeg < -1e-6 || tSeg > 1 + 1e-6) continue;
+                if (tSeg < -1e-6 || tSeg >= 1 - 1e-6) continue;
                 const xParam = (-rx * ddy + ry * ddx) / det;
                 hits.push(xParam);
             }
@@ -362,7 +386,7 @@ export class ImageHatching {
                 const lineIndex = Math.round(Math.abs((y - yMin) / minSpacing));
                 const stepX = 0.5;
 
-                // â”€â”€ Determine active x-ranges for this scan line â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // ── Determine active x-ranges for this scan line ──────────────
                 // If boundary segments are provided, use them for the clip; otherwise
                 // fall back to density threshold (old behaviour).
                 type Range = { xStart: number; xEnd: number };
@@ -376,7 +400,7 @@ export class ImageHatching {
                     }
                 }
 
-                // â”€â”€ Emit hatch segments within each active range â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // ── Emit hatch segments within each active range ──────────────
                 for (const range of activeRanges) {
                     let currentSegment: MakerJs.IPoint[] = [];
 
@@ -386,7 +410,7 @@ export class ImageHatching {
                                 currentSegment[0][0] - currentSegment[1][0],
                                 currentSegment[0][1] - currentSegment[1][1]
                             );
-                            if (len > 0.5) {
+                            if (len > 0.01) {
                                 model.models![`hatch_${angleOffset}_${lineIdCounter++}`] =
                                     new MakerJs.models.ConnectTheDots(false, [...currentSegment]);
                             }
@@ -398,14 +422,20 @@ export class ImageHatching {
                     const xStart = Math.max(xMin, range.xStart);
                     const xEnd = Math.min(xMax, range.xEnd);
 
+                    let prevDens = 1.0;
+                    let prevRx = cx + xStart * cosA - y * sinA;
+                    let prevRy = cy + xStart * sinA + y * cosA;
+                    let prevDraw = false;
+
                     for (let x = xStart; x <= xEnd; x = Math.min(x + stepX, xEnd)) {
                         const rx = cx + x * cosA - y * sinA;
                         const ry = cy + x * sinA + y * cosA;
                         const inBounds = rx >= 0 && rx <= width && ry >= 0 && ry <= height;
                         const dens = inBounds ? getDensity(rx, ry) : 1.0;
+                        const alpha = inBounds ? getAlpha(rx, ry) : 0.0;
 
                         let draw = false;
-                        if (inBounds && dens < threshold) {
+                        if (inBounds && dens < threshold && (hasTransparency ? alpha >= 0.5 : true)) {
                             const darkness = 1.0 - dens;
                             let normalizedDarkness = Math.max(0, darkness - (1.0 - threshold)) / threshold;
                             normalizedDarkness = Math.min(1.0, normalizedDarkness);
@@ -431,31 +461,47 @@ export class ImageHatching {
                             }
                         }
 
-                        if (draw) {
-                            if (currentSegment.length === 0) currentSegment.push([R(rx), R(ry)]);
-                            else if (currentSegment.length === 1) currentSegment.push([R(rx), R(ry)]);
-                            else currentSegment[1] = [R(rx), R(ry)];
-                        } else if (currentSegment.length > 0) {
-                            if (currentSegment.length < 2) currentSegment.push([R(rx), R(ry)]);
-                            emitSeg();
+                        if (x === xStart) {
+                            if (draw) currentSegment = [[R(rx), R(ry)]];
+                        } else {
+                            if (draw && !prevDraw) {
+                                let sRx = rx, sRy = ry;
+                                if (prevDens >= threshold && dens < threshold && dens !== prevDens) {
+                                    const t = (threshold - prevDens) / (dens - prevDens);
+                                    sRx = prevRx + t * (rx - prevRx); sRy = prevRy + t * (ry - prevRy);
+                                }
+                                currentSegment = [[R(sRx), R(sRy)]];
+                            } else if (!draw && prevDraw) {
+                                let eRx = prevRx, eRy = prevRy;
+                                if (prevDens < threshold && dens >= threshold && dens !== prevDens) {
+                                    const t = (threshold - prevDens) / (dens - prevDens);
+                                    eRx = prevRx + t * (rx - prevRx); eRy = prevRy + t * (ry - prevRy);
+                                }
+                                if (currentSegment.length >= 1) {
+                                    if (currentSegment.length === 1) currentSegment.push([R(eRx), R(eRy)]);
+                                    else currentSegment[1] = [R(eRx), R(eRy)];
+                                }
+                                emitSeg();
+                            } else if (draw) {
+                                if (currentSegment.length === 1) currentSegment.push([R(rx), R(ry)]);
+                                else currentSegment[1] = [R(rx), R(ry)];
+                            }
                         }
 
-                        if (x >= xEnd) break;
+                        if (x === xEnd) break;
+                        prevDens = dens; prevRx = rx; prevRy = ry; prevDraw = draw;
                     }
 
-                    // Flush last segment â€” use exact boundary point as endpoint
-                    if (currentSegment.length > 0) {
-                        const endRx = cx + range.xEnd * cosA - y * sinA;
-                        const endRy = cy + range.xEnd * sinA + y * cosA;
-                        if (currentSegment.length < 2) currentSegment.push([R(endRx), R(endRy)]);
-                        else currentSegment[1] = [R(endRx), R(endRy)];
+                    if (prevDraw && currentSegment.length >= 1) {
+                        if (currentSegment.length === 1) currentSegment.push([R(prevRx), R(prevRy)]);
                         emitSeg();
                     }
                 }
 
-                // â”€â”€ Fallback: no boundary â€” use density threshold scan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // ── Fallback: no boundary — use density threshold scan ──────────
                 if (!boundarySegs || boundarySegs.length === 0) {
                     let prevDens = 1.0;
+                    let prevAlpha = 0.0;
                     let prevRx = cx + xMin * cosA - y * sinA;
                     let prevRy = cy + xMin * sinA + y * cosA;
                     let prevDraw = false;
@@ -464,7 +510,7 @@ export class ImageHatching {
                     const emitSeg = () => {
                         if (currentSegment.length === 2) {
                             const len = Math.hypot(currentSegment[0][0] - currentSegment[1][0], currentSegment[0][1] - currentSegment[1][1]);
-                            if (len > 0.5) {
+                            if (len > 0.01) {
                                 model.models![`hatch_${angleOffset}_${lineIdCounter++}`] =
                                     new MakerJs.models.ConnectTheDots(false, [...currentSegment]);
                             }
@@ -477,8 +523,9 @@ export class ImageHatching {
                         const ry = cy + x * sinA + y * cosA;
                         const inBounds = rx >= 0 && rx <= width && ry >= 0 && ry <= height;
                         const dens = inBounds ? getDensity(rx, ry) : 1.0;
+                        const alpha = inBounds ? getAlpha(rx, ry) : 0.0;
                         let draw = false;
-                        if (inBounds && dens < threshold) {
+                        if (inBounds && dens < threshold && (hasTransparency ? alpha >= 0.5 : true)) {
                             const darkness = 1.0 - dens;
                             let nd = Math.max(0, darkness - (1.0 - threshold)) / threshold;
                             nd = Math.min(1.0, nd);
@@ -498,14 +545,20 @@ export class ImageHatching {
                         }
                         if (draw && !prevDraw) {
                             let sRx = rx, sRy = ry;
-                            if (prevDens >= threshold && dens < threshold && dens !== prevDens) {
+                            if (hasTransparency && prevAlpha < 0.5 && alpha >= 0.5 && alpha !== prevAlpha) {
+                                const t = (0.5 - prevAlpha) / (alpha - prevAlpha);
+                                sRx = prevRx + t * (rx - prevRx); sRy = prevRy + t * (ry - prevRy);
+                            } else if (prevDens >= threshold && dens < threshold && dens !== prevDens) {
                                 const t = (threshold - prevDens) / (dens - prevDens);
                                 sRx = prevRx + t * (rx - prevRx); sRy = prevRy + t * (ry - prevRy);
                             }
                             currentSegment = [[R(sRx), R(sRy)]];
                         } else if (!draw && prevDraw) {
                             let eRx = prevRx, eRy = prevRy;
-                            if (prevDens < threshold && dens >= threshold && dens !== prevDens) {
+                            if (hasTransparency && prevAlpha >= 0.5 && alpha < 0.5 && alpha !== prevAlpha) {
+                                const t = (0.5 - prevAlpha) / (alpha - prevAlpha);
+                                eRx = prevRx + t * (rx - prevRx); eRy = prevRy + t * (ry - prevRy);
+                            } else if (prevDens < threshold && dens >= threshold && dens !== prevDens) {
                                 const t = (threshold - prevDens) / (dens - prevDens);
                                 eRx = prevRx + t * (rx - prevRx); eRy = prevRy + t * (ry - prevRy);
                             }
@@ -518,7 +571,7 @@ export class ImageHatching {
                             if (currentSegment.length === 1) currentSegment.push([R(rx), R(ry)]);
                             else currentSegment[1] = [R(rx), R(ry)];
                         }
-                        prevDens = dens; prevRx = rx; prevRy = ry; prevDraw = draw;
+                        prevDens = dens; prevAlpha = alpha; prevRx = rx; prevRy = ry; prevDraw = draw;
                     }
                     if (prevDraw && currentSegment.length >= 1) {
                         if (currentSegment.length === 1) currentSegment.push([R(prevRx), R(prevRy)]);
@@ -571,7 +624,8 @@ export class ImageHatching {
                 if (startCell < 0 || spatialGrid[startCell] !== 0) return;
 
                 const startDens = getDensity(startX, startY);
-                if (startDens >= threshold) return; // Started in empty space
+                const startAlpha = getAlpha(startX, startY);
+                if (startDens >= threshold || (hasTransparency && startAlpha < 0.5)) return; // Started in empty space
 
                 const pts: MakerJs.IPoint[] = [];
                 const cellClaims: number[] = [];
@@ -587,6 +641,7 @@ export class ImageHatching {
                     if (dir === 1) currentPath.push([R(px), R(py)]);
 
                     let prevDens = startDens;
+                    let prevAlpha = startAlpha;
 
                     for (let step = 0; step < 1000; step++) {
                         let flow = getTangent(px, py);
@@ -625,9 +680,16 @@ export class ImageHatching {
 
                         if (nx < 0 || nx > width || ny < 0 || ny > height) break;
                         const nDens = getDensity(nx, ny);
-                        if (nDens >= threshold) {
-                            // Interpolate exact edge point using previous step's density
-                            if (nDens !== prevDens) {
+                        const nAlpha = getAlpha(nx, ny);
+                        const isInside = hasTransparency ? (nAlpha >= 0.5) : true;
+
+                        if (!isInside || nDens >= threshold) {
+                            if (hasTransparency && !isInside && nAlpha !== prevAlpha) {
+                                const t = (0.5 - prevAlpha) / (nAlpha - prevAlpha);
+                                const edgeX = px + t * (nx - px);
+                                const edgeY = py + t * (ny - py);
+                                currentPath.push([R(edgeX), R(edgeY)]);
+                            } else if (nDens !== prevDens) {
                                 const t = (threshold - prevDens) / (nDens - prevDens);
                                 const edgeX = px + t * (nx - px);
                                 const edgeY = py + t * (ny - py);
@@ -663,6 +725,7 @@ export class ImageHatching {
                         currentPath.push([R(nx), R(ny)]);
                         px = nx; py = ny;
                         prevDens = nDens;
+                        prevAlpha = nAlpha;
 
                         const cId = getCell(px, py);
                         if (cId >= 0 && spatialGrid[cId] === 0) {
@@ -755,9 +818,6 @@ export class ImageHatching {
                 }
             }
             const sampled = Math.ceil(dWidth / 10) * Math.ceil(dHeight / 10);
-            console.log(`[hatching-debug] pixel stats (sampled ${sampled} of ${total}):`);
-            console.log(`  transparent(a=0): ${transparent}, dark(luma<0.5): ${dark}, light(luma>=0.5): ${light}`);
-            console.log(`  alpha range: [${minAlpha}, ${maxAlpha}], R range: [${minR}, ${maxR}]`);
             // Also scan the alpha channel for a row through the middle
             const midRow = Math.floor(dHeight / 2);
             const alphaSlice: number[] = [];
@@ -765,7 +825,6 @@ export class ImageHatching {
                 const idx = (midRow * dWidth + px) * ch;
                 alphaSlice.push(dData[idx + 3]);
             }
-            console.log(`  alpha along middle row (${alphaSlice.length} samples):`, alphaSlice);
         }
 
         if (options.normalMap) {
@@ -773,7 +832,6 @@ export class ImageHatching {
         } else {
             const bThresh = options.contourThreshold ?? threshold;
             const boundary = buildBoundary(bThresh);
-            console.log('[hatching-debug] boundary segments:', boundary.length);
 
             runRasterHatching(0, boundary);
             if (options.crossHatch || (options.crossHatchChance || 0) > 0) {

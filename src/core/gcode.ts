@@ -669,3 +669,93 @@ export function generateGCodeForLayers(
         throw new Error(`G-Code generation failed: ${error.message}`);
     }
 }
+
+/**
+ * Simulate GCode generation to extract precise lengths for drawing and travel.
+ */
+export function computeGCodeStats(
+    model: MakerJs.IModel,
+    config: AppConfig
+): { pathCount: number; totalLength: number; travelLength: number } {
+    let pathCount = 0;
+    let totalLength = 0;
+    let travelLength = 0;
+
+    MakerJs.model.originate(model);
+
+    let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
+    const orphans = collectOrphanedPaths(model, chains);
+
+    let optimizedChains: OptimizedChain[];
+    if (config.gcode.optimizePaths) {
+        optimizedChains = optimizeChainOrder(chains, config.gcode.joinTolerance || 0.01);
+    } else {
+        optimizedChains = chains.map(chain => ({ chain, reverse: false }));
+    }
+
+    const canvasHeight = config.canvas.height;
+    const transformCoords = (x: number, y: number): [number, number] => {
+        let finalX = x - (config.gcode.originX || 0);
+        let finalY = canvasHeight - y;
+        if (config.gcode.swapAxes) [finalX, finalY] = [finalY, finalX];
+        if (config.gcode.invertX) finalX = -finalX;
+        if (config.gcode.invertY) finalY = -finalY;
+        return [finalX, finalY];
+    };
+
+    let currentPos: [number, number] = [0, 0];
+
+    const evaluateChain = (optimized: OptimizedChain) => {
+        let points = MakerJs.chain.toKeyPoints(optimized.chain, 1.0);
+        if (optimized.reverse) points = points.reverse();
+
+        if (optimized.chain.endless && points.length > 0) {
+            const start = points[0];
+            const end = points[points.length - 1];
+            if (Math.hypot(start[0] - end[0], start[1] - end[1]) > 0.001) {
+                points.push(start);
+            }
+        }
+
+        if (points.length === 0) return;
+
+        const [startX, startY] = transformCoords(points[0][0], points[0][1]);
+        const zUp = config.gcode.zUp !== undefined ? config.gcode.zUp : 2;
+        const zDown = config.gcode.zDown !== undefined ? config.gcode.zDown : 0;
+        const zTravel = Math.abs(zUp - zDown) * 2; // Up at end of last move, down at start of this move
+
+        // Travel to chain start + Z lift/drop
+        travelLength += Math.hypot(startX - currentPos[0], startY - currentPos[1]) + zTravel;
+        currentPos = [startX, startY];
+
+        // Draw segments
+        for (let i = 1; i < points.length; i++) {
+            const [px, py] = transformCoords(points[i][0], points[i][1]);
+            totalLength += Math.hypot(px - currentPos[0], py - currentPos[1]);
+            currentPos = [px, py];
+            pathCount++;
+        }
+    };
+
+    optimizedChains.forEach(evaluateChain);
+
+    orphans.forEach(orphan => {
+        const link = orphan.links[0] as any;
+        const p0 = link.endPoints[0] as MakerJs.IPoint;
+        const p1 = link.endPoints[1] as MakerJs.IPoint;
+        if (!p0 || !p1) return;
+
+        const [startX, startY] = transformCoords(p0[0], p0[1]);
+        const [endX, endY] = transformCoords(p1[0], p1[1]);
+        const zUp = config.gcode.zUp !== undefined ? config.gcode.zUp : 2;
+        const zDown = config.gcode.zDown !== undefined ? config.gcode.zDown : 0;
+        const zTravel = Math.abs(zUp - zDown) * 2;
+
+        travelLength += Math.hypot(startX - currentPos[0], startY - currentPos[1]) + zTravel;
+        totalLength += Math.hypot(endX - startX, endY - startY);
+        currentPos = [endX, endY];
+        pathCount++;
+    });
+
+    return { pathCount, totalLength, travelLength };
+}

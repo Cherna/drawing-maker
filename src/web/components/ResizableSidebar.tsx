@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 import { GripVertical } from 'lucide-react';
 
 interface ResizableSidebarProps {
-  stats?: { pathCount: number; totalLength: number } | null;
+  stats?: { pathCount: number; totalLength: number; travelLength?: number } | null;
 }
 
 export default function ResizableSidebar({ stats }: ResizableSidebarProps) {

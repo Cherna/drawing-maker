@@ -7,11 +7,12 @@ import PathStats from './PathStats';
 import { useConfigStore } from '../store/config-store';
 
 interface SidebarProps {
-  stats?: { pathCount: number; totalLength: number } | null;
+  stats?: { pathCount: number; totalLength: number; travelLength?: number } | null;
 }
 
 export default function Sidebar({ stats }: SidebarProps) {
   const feedRate = useConfigStore((state) => state.config.gcode?.feedRate || 1000);
+  const travelRate = useConfigStore((state) => state.config.gcode?.travelRate || 3000);
 
   return (
     <div className="h-full w-full overflow-y-auto bg-card border-r">
@@ -37,7 +38,7 @@ export default function Sidebar({ stats }: SidebarProps) {
 
       {stats && (
         <div className="p-4 border-t border-border">
-          <PathStats stats={stats} feedRate={feedRate} />
+          <PathStats stats={stats} feedRate={feedRate} travelRate={travelRate} />
         </div>
       )}
     </div>

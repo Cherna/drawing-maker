@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { AppConfig, Layer } from '../types';
 import { PipelineSketch } from '../sketches/pipeline-sketch';
-import { generateGCode, generateGCodeForLayers } from '../core/gcode';
+import { generateGCode, generateGCodeForLayers, computeGCodeStats } from '../core/gcode';
 import { modelToSVG, layersToSVG, modelToSVGWithColor, getModelStats, modelToAnimatedSVG } from '../core/svg-exporter';
 import { Pipeline } from '../core/pipeline';
 
@@ -116,13 +116,13 @@ app.post('/api/preview', async (req, res) => {
             }
 
             const svg = layersToSVG(layerData, previewConfig.canvas);
-            const stats = getModelStats(finalModel);
+            const stats = computeGCodeStats(finalModel, previewConfig);
             res.json({ svg, stats });
         } else {
             // Backward compatibility: use old pipeline for non-layered configs
             const model = await Pipeline.execute(previewConfig.params.steps || [], previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode);
             const svg = modelToSVG(model, previewConfig.canvas);
-            const stats = getModelStats(model);
+            const stats = computeGCodeStats(model, previewConfig);
             res.json({ svg, stats });
         }
     } catch (error: any) {

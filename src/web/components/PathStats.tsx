@@ -1,18 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 interface PathStatsProps {
-    stats?: { pathCount: number; totalLength: number } | null;
+    stats?: { pathCount: number; totalLength: number; travelLength?: number } | null;
     feedRate?: number; // mm/min
+    travelRate?: number; // mm/min
 }
 
-export default function PathStats({ stats, feedRate = 1000 }: PathStatsProps) {
+export default function PathStats({ stats, feedRate = 1000, travelRate = 3000 }: PathStatsProps) {
     if (!stats) {
         return null;
     }
 
-    const { pathCount, totalLength } = stats;
-    const estimatedMinutes = totalLength / feedRate;
-    const estimatedSeconds = Math.round(estimatedMinutes * 60);
+    const { pathCount, totalLength, travelLength = 0 } = stats;
+    const estimatedDrawMinutes = totalLength / feedRate;
+    const estimatedTravelMinutes = travelLength / travelRate;
+    const estimatedSeconds = Math.round((estimatedDrawMinutes + estimatedTravelMinutes) * 60);
 
     const formatTime = (seconds: number): string => {
         if (seconds < 60) {
@@ -42,6 +44,12 @@ export default function PathStats({ stats, feedRate = 1000 }: PathStatsProps) {
                     <span className="text-muted-foreground">Path Count:</span>
                     <span className="font-medium">{pathCount}</span>
                 </div>
+                {travelLength > 0 && (
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Travel Length:</span>
+                        <span className="font-medium">{travelLength.toFixed(2)} mm</span>
+                    </div>
+                )}
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Est. Draw Time:</span>
                     <span className="font-medium">{formatTime(estimatedSeconds)}</span>

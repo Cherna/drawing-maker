@@ -63,6 +63,7 @@ This document defines the standard operating procedures (Skills) for working in 
     -   Verify fix visually or via logs.
 3.  **Cleanup**:
     -   Remove all debug logs before marking task as complete.
+    -   **CRITICAL**: Always delete any temporary scripts, scratchpads, or debug files (e.g. `test.js`, `new_code.ts`, `diff.txt`) generated during the session after finishing a feature.
 
 ## Skill: Refactoring
 
