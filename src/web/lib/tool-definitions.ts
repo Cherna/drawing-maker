@@ -420,6 +420,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'patternBrightness', label: 'Pattern Brightness', type: 'number', min: -1, max: 1, step: 0.05, default: 0, showIf: (p) => ['simplex', 'perlin', 'turbulence', 'marble', 'cells', 'noise', 'cubes'].includes(p.type) },
     ],
   },
+  'simplify': {
+    category: 'modifier',
+    label: 'Simplify',
+    params: [
+      { key: 'tolerance', label: 'Tolerance (mm)', type: 'number', min: 0.01, max: 10, step: 0.01, default: 0.3 },
+    ],
+  },
   'duplicate': {
     category: 'modifier',
     label: 'Duplicate',

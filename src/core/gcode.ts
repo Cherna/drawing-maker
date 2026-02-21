@@ -432,6 +432,90 @@ function optimizeNearestNeighbor(chains: MakerJs.IChain[]): OptimizedChain[] {
     return optimized;
 }
 
+/**
+ * Sort orphan hatch lines for minimal travel using a boustrophedon
+ * (back-and-forth) pattern.
+ *
+ * Strategy:
+ *  1. Compute the dominant direction of the set (average line direction).
+ *  2. Project each line's midpoint onto the perpendicular axis → "row index".
+ *  3. Sort rows; within each row sort by axial position.
+ *  4. Alternate direction every row and pick the nearest endpoint to continue from.
+ */
+function optimizeOrphans(
+    orphans: MakerJs.IChain[],
+    _currentPos?: [number, number]
+): { orphan: MakerJs.IChain; reverse: boolean }[] {
+    if (orphans.length <= 1)
+        return orphans.map(o => ({ orphan: o, reverse: false }));
+
+    type OInfo = {
+        orphan: MakerJs.IChain;
+        p0: [number, number];
+        p1: [number, number];
+        mid: [number, number];
+    };
+
+    const infos: OInfo[] = orphans.map(o => {
+        const link = (o.links[0] as any);
+        const p0 = (link.endPoints[0] as [number, number]) || [0, 0];
+        const p1 = (link.endPoints[1] as [number, number]) || [0, 0];
+        return { orphan: o, p0, p1, mid: [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2] };
+    });
+
+    // ── Estimate dominant hatch direction from the first line ──────────
+    const ref = infos[0];
+    const axX = ref.p1[0] - ref.p0[0];
+    const axY = ref.p1[1] - ref.p0[1];
+    const axLen = Math.hypot(axX, axY) || 1;
+    // Unit vector along the lines (axial) and perpendicular to them
+    const ax: [number, number] = [axX / axLen, axY / axLen];
+    const perp: [number, number] = [-ax[1], ax[0]];
+
+    // ── Project midpoints onto perpendicular axis ──────────────────────
+    const withProj = infos.map(info => ({
+        ...info,
+        perpCoord: info.mid[0] * perp[0] + info.mid[1] * perp[1],
+        axCoord: info.mid[0] * ax[0] + info.mid[1] * ax[1],
+    }));
+
+    // ── Bin into rows (cluster by perpendicular coord) ─────────────────
+    const binSize = 0.01; // mm – force almost every line into its own row for alternating directions
+    withProj.sort((a, b) => a.perpCoord - b.perpCoord);
+
+    type Row = typeof withProj;
+    const rows: Row[] = [];
+    let cur: Row = [withProj[0]];
+    for (let i = 1; i < withProj.length; i++) {
+        if (withProj[i].perpCoord - cur[cur.length - 1].perpCoord < binSize) {
+            cur.push(withProj[i]);
+        } else {
+            rows.push(cur);
+            cur = [withProj[i]];
+        }
+    }
+    rows.push(cur);
+
+    // ── Emit rows with alternating direction ───────────────────────────
+    const result: { orphan: MakerJs.IChain; reverse: boolean }[] = [];
+    let goRight = true; // even rows left→right, odd rows right→left
+
+    for (const row of rows) {
+        row.sort((a, b) => goRight
+            ? a.axCoord - b.axCoord
+            : b.axCoord - a.axCoord);
+
+        for (const item of row) {
+            // Pick whether to reverse so the pen starts from the near end
+            // (for left→right passes use p0; for right→left passes use p1)
+            result.push({ orphan: item.orphan, reverse: !goRight });
+        }
+        goRight = !goRight;
+    }
+
+    return result;
+}
+
 // ... (Updating exports to pass config.gcode.joinTolerance)
 
 export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: PostProcessorType = 'standard'): string {
@@ -521,14 +605,19 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
 
         optimizedChains.forEach(emitChainMoves);
 
-        // Emit each orphan hatch line individually (pen-up between every segment)
-        orphans.forEach((orphan, i) => {
+        // Emit orphan hatch lines — boustrophedon-sorted when path optimisation is on
+        const sortedOrphans = config.gcode.optimizePaths
+            ? optimizeOrphans(orphans)
+            : orphans.map(o => ({ orphan: o, reverse: false }));
+
+        sortedOrphans.forEach(({ orphan, reverse }, i) => {
             try {
-                // Use pre-computed absolute endpoints from the orphan link
                 const link = orphan.links[0] as any;
-                const p0 = link.endPoints[0] as MakerJs.IPoint;
-                const p1 = link.endPoints[1] as MakerJs.IPoint;
-                if (!p0 || !p1) return;
+                const rawP0 = link.endPoints[0] as MakerJs.IPoint;
+                const rawP1 = link.endPoints[1] as MakerJs.IPoint;
+                if (!rawP0 || !rawP1) return;
+                const p0 = reverse ? rawP1 : rawP0;
+                const p1 = reverse ? rawP0 : rawP1;
 
                 const [startX, startY] = transformCoords(p0[0], p0[1]);
                 const [endX, endY] = transformCoords(p1[0], p1[1]);
@@ -636,13 +725,19 @@ export function generateGCodeForLayers(
                     lines.push(post.formatSafeZ(config.gcode.zUp));
                 });
 
-                // Orphan hatch lines: each gets its own pen-lift (never consolidated)
-                orphans.forEach((orphan, i) => {
+                // Orphan hatch lines — boustrophedon-sorted when path optimisation is on
+                const sortedOrphans = config.gcode.optimizePaths
+                    ? optimizeOrphans(orphans)
+                    : orphans.map(o => ({ orphan: o, reverse: false }));
+
+                sortedOrphans.forEach(({ orphan, reverse }, i) => {
                     try {
                         const link = orphan.links[0] as any;
-                        const p0 = link.endPoints[0] as MakerJs.IPoint;
-                        const p1 = link.endPoints[1] as MakerJs.IPoint;
-                        if (!p0 || !p1) return;
+                        const rawP0 = link.endPoints[0] as MakerJs.IPoint;
+                        const rawP1 = link.endPoints[1] as MakerJs.IPoint;
+                        if (!rawP0 || !rawP1) return;
+                        const p0 = reverse ? rawP1 : rawP0;
+                        const p1 = reverse ? rawP0 : rawP1;
                         const [startX, startY] = transformCoords(p0[0], p0[1]);
                         const [endX, endY] = transformCoords(p1[0], p1[1]);
                         lines.push(post.formatTravel(startX, startY, config.gcode.travelRate));

@@ -1,5 +1,5 @@
 import MakerJs from 'makerjs';
-import { createNoise2D } from 'simplex-noise';
+
 import { Transformer } from '../core/transformer';
 
 // Seeded random number generator (mulberry32)
@@ -14,15 +14,7 @@ function seededRandom(seed: number) {
     };
 }
 
-export interface NoiseOptions {
-    scale: number;
-    magnitude: number;
-    axis?: 'x' | 'y' | 'both';
-    seed?: number;
-    octaves?: number;       // For turbulence-like effect
-    persistence?: number;   // Amplitude decay per octave
-    lacunarity?: number;    // Frequency growth per octave
-}
+
 
 // Helper to check if model contains any arcs or circles
 function modelHasArcs(model: MakerJs.IModel): boolean {
@@ -42,70 +34,7 @@ export class Effects {
         return Transformer.resample(model, distance);
     }
 
-    /**
-     * Apply noise displacement to paths
-     * Supports single-octave and multi-octave (turbulence) noise
-     */
-    static noise(model: MakerJs.IModel, options: NoiseOptions, mask?: (x: number, y: number) => number) {
-        // Auto-resample if model contains curves, as displace only works on lines
-        if (modelHasArcs(model)) {
-            // Default reasonable resolution (0.5mm)
-            // We must return the newly resampled reference so it updates in the pipeline
-            model = Transformer.resample(model, 0.5);
-        }
 
-        const seed = options.seed ?? Date.now();
-        const rng = seededRandom(seed);
-        const noise2D = createNoise2D(rng);
-
-        const octaves = options.octaves ?? 1;
-        const persistence = options.persistence ?? 0.5;
-        const lacunarity = options.lacunarity ?? 2;
-
-        // For multi-octave, we need a second noise instance for the second axis
-        const noise2D_y = octaves > 1 ? createNoise2D(seededRandom(seed + 1000)) : noise2D;
-
-        Transformer.displace(model, (x, y) => {
-            // Calculate noise value (single or multi-octave)
-            let nx = 0, ny = 0;
-            let amplitude = 1;
-            let frequency = options.scale;
-            let maxValue = 0;
-
-            for (let i = 0; i < octaves; i++) {
-                const sampleX = x * frequency;
-                const sampleY = y * frequency;
-
-                nx += noise2D(sampleX, sampleY) * amplitude;
-                ny += noise2D_y(sampleX + 100, sampleY + 100) * amplitude;
-
-                maxValue += amplitude;
-                amplitude *= persistence;
-                frequency *= lacunarity;
-            }
-
-            // Normalize
-            nx /= maxValue;
-            ny /= maxValue;
-
-            // Calculate mask weight (0 to 1)
-            const weight = mask ? mask(x, y) : 1;
-
-            let dx = 0;
-            let dy = 0;
-
-            if (options.axis === 'x' || options.axis === 'both' || !options.axis) {
-                dx = nx * options.magnitude * weight;
-            }
-            if (options.axis === 'y' || options.axis === 'both' || !options.axis) {
-                dy = ny * options.magnitude * weight;
-            }
-
-            return { x: x + dx, y: y + dy };
-        });
-
-        return model;
-    }
 
     /**
      * Probabilistically trim paths based on mask value
@@ -178,37 +107,130 @@ export class Effects {
     }
 
     /**
-     * Simplify paths by removing points that don't contribute much to the shape
-     * Uses Douglas-Peucker-like approach per segment
+     * Simplify paths using the Ramer-Douglas-Peucker algorithm.
+     * Chains connected line segments into polylines and removes intermediate
+     * points that deviate less than `tolerance` mm from the straight line
+     * between their neighbours.  Non-line paths and isolated segments are kept.
      */
     static simplify(model: MakerJs.IModel, tolerance: number) {
-        // For now, just filter out very short segments
-        const filterShort = (m: MakerJs.IModel) => {
-            if (m.paths) {
-                const keys = Object.keys(m.paths).sort();
-                for (const id of keys) {
-                    const path = m.paths[id];
-                    if (path.type === 'line') {
-                        const line = path as MakerJs.IPathLine;
-                        const len = Math.hypot(
-                            line.end[0] - line.origin[0],
-                            line.end[1] - line.origin[1]
-                        );
-                        if (len < tolerance) {
-                            delete m.paths[id];
-                        }
-                    }
-                }
+        // ── RDP core ───────────────────────────────────────────────────
+        const rdp = (pts: [number, number][], eps: number): [number, number][] => {
+            if (pts.length <= 2) return pts;
+            // Find the point with the maximum perpendicular distance from the
+            // line between the first and last point.
+            const [x1, y1] = pts[0];
+            const [x2, y2] = pts[pts.length - 1];
+            const dx = x2 - x1, dy = y2 - y1;
+            const len = Math.hypot(dx, dy);
+            let maxDist = 0, maxIdx = 1;
+            for (let i = 1; i < pts.length - 1; i++) {
+                const dist = len < 1e-10
+                    ? Math.hypot(pts[i][0] - x1, pts[i][1] - y1)
+                    : Math.abs(dy * pts[i][0] - dx * pts[i][1] + x2 * y1 - y2 * x1) / len;
+                if (dist > maxDist) { maxDist = dist; maxIdx = i; }
             }
-            if (m.models) {
-                const keys = Object.keys(m.models).sort();
-                for (const key of keys) {
-                    filterShort(m.models[key]);
+            if (maxDist <= eps) return [pts[0], pts[pts.length - 1]];
+            return [
+                ...rdp(pts.slice(0, maxIdx + 1), eps),
+                ...rdp(pts.slice(maxIdx), eps).slice(1)
+            ];
+        };
+
+        // ── Simplify one flat model (paths only, no sub-models) ────────
+        const simplifyFlat = (m: MakerJs.IModel) => {
+            if (!m.paths) return;
+
+            // Build adjacency: endpoint → [pathKey, …]
+            const ptKey = (x: number, y: number) =>
+                `${Math.round(x * 1e4)},${Math.round(y * 1e4)}`;
+
+            type Endpoint = { key: string; other: string; pathId: string };
+            const adj = new Map<string, Endpoint[]>();
+            const lines = new Map<string, { origin: [number, number]; end: [number, number] }>();
+
+            for (const id of Object.keys(m.paths)) {
+                const p = m.paths[id];
+                if (p.type !== 'line') continue;
+                const ln = p as MakerJs.IPathLine;
+                const o: [number, number] = [ln.origin[0], ln.origin[1]];
+                const e: [number, number] = [ln.end[0], ln.end[1]];
+                lines.set(id, { origin: o, end: e });
+                const ok = ptKey(o[0], o[1]), ek = ptKey(e[0], e[1]);
+                if (!adj.has(ok)) adj.set(ok, []);
+                if (!adj.has(ek)) adj.set(ek, []);
+                adj.get(ok)!.push({ key: ok, other: ek, pathId: id });
+                adj.get(ek)!.push({ key: ek, other: ok, pathId: id });
+            }
+
+            // Walk chains: start from degree-1 endpoints (or any unvisited for loops)
+            const visited = new Set<string>();
+            const chains: { ids: string[]; pts: [number, number][] }[] = [];
+
+            const walkChain = (startId: string, startEnd: 'origin' | 'end') => {
+                const ids: string[] = [];
+                const pts: [number, number][] = [];
+                let curId = startId;
+                let fromEnd = startEnd === 'end'; // we leave from the 'end' side
+
+                while (true) {
+                    if (visited.has(curId)) break;
+                    visited.add(curId);
+                    ids.push(curId);
+                    const seg = lines.get(curId)!;
+                    if (pts.length === 0) {
+                        pts.push(fromEnd ? seg.end : seg.origin);
+                    }
+                    const nextPt = fromEnd ? seg.origin : seg.end;
+                    pts.push(nextPt);
+
+                    const nk = ptKey(nextPt[0], nextPt[1]);
+                    const neighbors = (adj.get(nk) || []).filter(e => !visited.has(e.pathId));
+                    if (neighbors.length !== 1) break; // junction or dead end
+                    const next = neighbors[0];
+                    fromEnd = (next.other === nk); // are we entering via the 'other' endpoint?
+                    curId = next.pathId;
+                }
+                if (ids.length >= 2) chains.push({ ids, pts });
+            };
+
+            // Find degree-1 start points
+            for (const [id, seg] of lines) {
+                if (visited.has(id)) continue;
+                const ok = ptKey(seg.origin[0], seg.origin[1]);
+                const ek = ptKey(seg.end[0], seg.end[1]);
+                const degO = (adj.get(ok) || []).length;
+                const degE = (adj.get(ek) || []).length;
+                if (degO === 1) { walkChain(id, 'origin'); }
+                else if (degE === 1) { walkChain(id, 'end'); }
+                else if (!visited.has(id)) { walkChain(id, 'origin'); } // loop
+            }
+
+            // Apply RDP and rewrite paths
+            for (const chain of chains) {
+                const simplified = rdp(chain.pts, tolerance);
+                // Remove original segments
+                for (const id of chain.ids) delete m.paths[id];
+                // Add simplified segments
+                for (let i = 0; i < simplified.length - 1; i++) {
+                    const key = `s_${chain.ids[0]}_${i}`;
+                    m.paths[key] = {
+                        type: 'line',
+                        origin: simplified[i],
+                        end: simplified[i + 1]
+                    } as MakerJs.IPathLine;
                 }
             }
         };
 
-        filterShort(model);
+        // ── Walk full model recursively ────────────────────────────────
+        const walk = (m: MakerJs.IModel) => {
+            simplifyFlat(m);
+            if (m.models) {
+                for (const key of Object.keys(m.models)) walk(m.models[key]);
+            }
+        };
+
+        walk(model);
         return model;
     }
 

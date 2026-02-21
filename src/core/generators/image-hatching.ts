@@ -393,7 +393,17 @@ export class ImageHatching {
                     const hits = hatchClipXValues(cx, cy, cosA, sinA, y, boundarySegs);
                     // Pair intersections: even-odd fill rule
                     for (let hi = 0; hi + 1 < hits.length; hi += 2) {
-                        activeRanges.push({ xStart: hits[hi], xEnd: hits[hi + 1] });
+                        const xS = hits[hi], xE = hits[hi + 1];
+                        // Sanity-check: the midpoint of this range must lie inside the
+                        // shape (density < threshold). When the boundary is concave or
+                        // has tiny gaps, even-odd pairing can produce phantom outside
+                        // ranges; this check discards them.
+                        const midX = (xS + xE) / 2;
+                        const mwx = cx + midX * cosA - y * sinA;
+                        const mwy = cy + midX * sinA + y * cosA;
+                        const midInBounds = mwx >= 0 && mwx <= width && mwy >= 0 && mwy <= height;
+                        if (!midInBounds || getDensity(mwx, mwy) >= threshold) continue;
+                        activeRanges.push({ xStart: xS, xEnd: xE });
                     }
                 }
 
@@ -419,10 +429,20 @@ export class ImageHatching {
                     const xStart = Math.max(xMin, range.xStart);
                     const xEnd = Math.min(xMax, range.xEnd);
 
+                    // World-space coords of the exact boundary clip points.
+                    // When a segment starts or ends at a range edge, snap to these
+                    // exact positions so lines touch the contour precisely — not
+                    // to wherever the density threshold happened to cross.
+                    const startWorldX = cx + xStart * cosA - y * sinA;
+                    const startWorldY = cy + xStart * sinA + y * cosA;
+                    const endWorldX = cx + xEnd * cosA - y * sinA;
+                    const endWorldY = cy + xEnd * sinA + y * cosA;
+
                     let prevDens = 1.0;
-                    let prevRx = cx + xStart * cosA - y * sinA;
-                    let prevRy = cy + xStart * sinA + y * cosA;
+                    let prevRx = startWorldX;
+                    let prevRy = startWorldY;
                     let prevDraw = false;
+                    let isFirstSample = true;
 
                     for (let x = xStart; x <= xEnd; x = Math.min(x + stepX, xEnd)) {
                         const rx = cx + x * cosA - y * sinA;
@@ -451,15 +471,21 @@ export class ImageHatching {
                             else shouldDrawPass = isAltPass ? isSwitched : !isSwitched;
 
                             if (shouldDrawPass) {
-                                const spacing = 1 << Math.max(0, (steps - 1 - bucketIndex));
+                                // Cap at 2^4 = 16 so adding more steps never makes light
+                                // areas absurdly sparse (spacing would otherwise grow as 2^(steps-1)).
+                                const spacing = 1 << Math.max(0, Math.min(4, steps - 1 - bucketIndex));
                                 if (lineIndex % spacing === 0) {
                                     draw = true;
                                 }
                             }
                         }
 
-                        if (x === xStart) {
-                            if (draw) currentSegment = [[R(rx), R(ry)]];
+                        if (isFirstSample) {
+                            isFirstSample = false;
+                            if (draw) {
+                                // Snap start to exact boundary clip point
+                                currentSegment = [[R(startWorldX), R(startWorldY)]];
+                            }
                         } else {
                             if (draw && !prevDraw) {
                                 let sRx = rx, sRy = ry;
@@ -490,7 +516,9 @@ export class ImageHatching {
                     }
 
                     if (prevDraw && currentSegment.length >= 1) {
-                        if (currentSegment.length === 1) currentSegment.push([R(prevRx), R(prevRy)]);
+                        // Snap end to exact boundary clip point
+                        if (currentSegment.length === 1) currentSegment.push([R(endWorldX), R(endWorldY)]);
+                        else currentSegment[1] = [R(endWorldX), R(endWorldY)];
                         emitSeg();
                     }
                 }
@@ -534,7 +562,7 @@ export class ImageHatching {
                             const alt = Math.abs(angleOffset) > 0.01;
                             if (options.crossHatch) sdp = true; else sdp = alt ? sw : !sw;
                             if (sdp) {
-                                const spacing = 1 << Math.max(0, (steps - 1 - bi));
+                                const spacing = 1 << Math.max(0, Math.min(4, steps - 1 - bi));
                                 if (lineIndex % spacing === 0) {
                                     draw = true;
                                 }

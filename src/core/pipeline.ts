@@ -228,25 +228,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
         return Effects.resample(model, resolution);
     },
 
-    // Explicit fill modifier: generates hatch lines inside all layer='filled' submodels.
-    // Place this BEFORE any warp/noise step so hatching deforms correctly with the geometry.
-    'fill': (model, params, _ctx, _bounds) => {
-        const fillParams = {
-            angle: params.angle ?? 0,
-            spacing: params.spacing ?? 0.5
-        };
-        const fillMarked = (m: MakerJs.IModel) => {
-            if (m.layer === 'filled') {
-                Filling.applyFilling(m, fillParams);
-                return;
-            }
-            if (m.models) {
-                for (const key in m.models) fillMarked(m.models[key]);
-            }
-        };
-        fillMarked(model);
-        // No return: mutates in-place
-    },
+
 
     'clip': (model, params, ctx, bounds) => {
         // Check if any margin param is set
@@ -262,20 +244,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
         return Effects.clip(model, bounds, margin);
     },
 
-    'noise': (model, params, ctx, bounds, mask) => {
-        const magnitude = params.magnitude ?? 5;
-        // Short-circuit: magnitude=0 means no displacement
-        if (magnitude === 0) return;
-        Effects.noise(model, {
-            scale: params.scale ?? 0.05,
-            magnitude,
-            axis: params.axis,
-            seed: params.seed,
-            octaves: params.octaves,
-            persistence: params.persistence,
-            lacunarity: params.lacunarity
-        }, mask);
-    },
+
 
     'trim': (model, params, ctx, bounds, mask) => {
         Effects.trim(model, params.threshold ?? 0.5, mask || (() => 1), params.seed);
