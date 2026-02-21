@@ -200,8 +200,6 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'flipX', label: 'Flip X', type: 'boolean', default: false },
       { key: 'flipY', label: 'Flip Y', type: 'boolean', default: false },
       { key: 'crossHatchChance', label: 'Alt-Dir Chance', type: 'number', min: 0, max: 1, step: 0.05, default: 0 },
-      { key: 'minPeriod', label: 'Min Period (darkest)', type: 'number', min: 1, max: 10, step: 1, default: 1 },
-      { key: 'maxPeriod', label: 'Max Period (lightest)', type: 'number', min: 1, max: 20, step: 1, default: 6 },
       { key: 'densityCurve', label: 'Density Curve', type: 'number', min: 0.1, max: 3, step: 0.1, default: 1 },
       { key: 'drawContour', label: 'Draw Contour', type: 'boolean', default: false },
       { key: 'contourThreshold', label: 'Contour Threshold', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5 },

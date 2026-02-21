@@ -15,8 +15,6 @@ export class ImageHatchingParams {
     offsetY?: number;
     flipX?: boolean;
     flipY?: boolean;
-    minPeriod?: number;      // darkest shading: draw every Nth line (1 = every line)
-    maxPeriod?: number;      // lightest shading: draw every Nth line (e.g. 6)
     densityCurve?: number;   // gamma exponent for the period curve (1=linear, <1=more dense darks, >1=sparser)
     drawContour?: boolean;   // trace the boundary of dark regions as a line
     contourThreshold?: number; // brightness cutoff for contour detection (default = same as threshold)
@@ -241,15 +239,29 @@ export class ImageHatching {
         const baseAngleRad = (options.baseAngle || 45) * Math.PI / 180;
         const threshold = options.threshold ?? 0.95;
         const densityMultiplier = Math.max(0.1, options.density || 1.5);
+
+        // Continuous density subdivision: bit-reversed fractional mapping [0, 1]
+        // This generates a Halton-style Van der Corput sequence.
+        // E.g., line 1 -> 0.5, line 2 -> 0.25, line 3 -> 0.75, line 4 -> 0.125
+        const getLineScore = (index: number): number => {
+            let n = index + 1; // 1-indexed to avoid 0 mapping to 0 for the first line
+            let rev = 0;
+            let p = 0.5;
+            while (n > 0) {
+                if (n % 2 === 1) rev += p;
+                p *= 0.5;
+                n = Math.floor(n / 2);
+            }
+            return rev;
+        };
+
+        // Number of discrete grey values steps mapping limits
         const steps = Math.floor(Math.max(1, options.shadingSteps || 5));
 
-        const baseMinSpacing = 2.0;
+        const baseMinSpacing = 1.0;
         const minSpacing = baseMinSpacing / densityMultiplier;
 
-        // Period controls: how many scan lines to skip per shading level
-        const periodMin = Math.max(1, Math.round(options.minPeriod ?? 1));
-        const periodMax = Math.max(periodMin, Math.round(options.maxPeriod ?? 6));
-        // densityCurve: gamma exponent applied to the normalised darkness before mapping to period
+        // densityCurve: gamma exponent applied to the normalised darkness before mapping to density
         // <1 = more lines in dark areas (emphasises darks), >1 = sparsely spaced (emphasises lights)
         const densityCurve = Math.max(0.1, options.densityCurve ?? 1.0);
 
@@ -456,8 +468,21 @@ export class ImageHatching {
                             if (shouldDrawPass) {
                                 const tBucket = steps > 1 ? bucketIndex / (steps - 1) : 1;
                                 const tCurved = Math.pow(tBucket, densityCurve);
-                                const period = Math.round(periodMax * (1 - tCurved) + periodMin * tCurved);
-                                if (lineIndex % period === 0) draw = true;
+
+                                // Map the brightness curve to an absolute fractional probability 0.0->1.0
+                                const densityVal = tCurved;
+
+                                // Quantize the density into discrete power-of-2 bands so that 
+                                // the Van der Corput sequence cleanly fills spacing uniformly.
+                                // Valid thresholds: 1, 0.5, 0.25, 0.125, etc.
+                                const currentDensityThreshold = densityVal >= 0.99 ? 1.0 :
+                                    densityVal <= 0.01 ? 0.0 :
+                                        Math.pow(0.5, Math.max(0, Math.floor(Math.log2(1.0 / densityVal))));
+
+                                // If the unique fractal line score falls under the threshold, we draw it!
+                                if (getLineScore(lineIndex) < currentDensityThreshold) {
+                                    draw = true;
+                                }
                             }
                         }
 
@@ -539,8 +564,17 @@ export class ImageHatching {
                             if (sdp) {
                                 const tB = steps > 1 ? bi / (steps - 1) : 1;
                                 const tC = Math.pow(tB, densityCurve);
-                                const per = Math.round(periodMax * (1 - tC) + periodMin * tC);
-                                if (lineIndex % per === 0) draw = true;
+
+                                const densityVal = tC;
+
+                                // Quantize the density into discrete power-of-2 bands
+                                const currentDensityThreshold = densityVal >= 0.99 ? 1.0 :
+                                    densityVal <= 0.01 ? 0.0 :
+                                        Math.pow(0.5, Math.max(0, Math.floor(Math.log2(1.0 / densityVal))));
+
+                                if (getLineScore(lineIndex) < currentDensityThreshold) {
+                                    draw = true;
+                                }
                             }
                         }
                         if (draw && !prevDraw) {
@@ -619,7 +653,7 @@ export class ImageHatching {
                 [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
             }
 
-            const traceStreamline = (startX: number, startY: number) => {
+            const traceStreamline = (startX: number, startY: number, lineId: number) => {
                 const startCell = getCell(startX, startY);
                 if (startCell < 0 || spatialGrid[startCell] !== 0) return;
 
@@ -629,6 +663,7 @@ export class ImageHatching {
 
                 const pts: MakerJs.IPoint[] = [];
                 const cellClaims: number[] = [];
+                const lineScore = getLineScore(lineId);
 
                 for (const dir of [1, -1]) {
                     let px = startX;
@@ -705,9 +740,16 @@ export class ImageHatching {
 
                         const tB = steps > 1 ? bi / (steps - 1) : 1;
                         const tC = Math.pow(tB, densityCurve);
-                        const reqClearance = Math.max(1, Math.round(periodMax * (1 - tC) + periodMin * tC));
+
+                        const densityVal = Math.pow(tB, densityCurve);
+
+                        // Quantize the density into discrete power-of-2 bands
+                        const currentDensityThreshold = densityVal >= 0.99 ? 1.0 :
+                            densityVal <= 0.01 ? 0.0 :
+                                Math.pow(0.5, Math.max(0, Math.floor(Math.log2(1.0 / densityVal))));
 
                         let collision = false;
+                        const reqClearance = 1; // Enforce minimum 1 grid cell spacing for structural integrity of vectors
                         for (let dy = -reqClearance; dy <= reqClearance; dy++) {
                             for (let dx = -reqClearance; dx <= reqClearance; dx++) {
                                 if (dx * dx + dy * dy <= reqClearance * reqClearance) {
@@ -720,9 +762,19 @@ export class ImageHatching {
                             if (collision) break;
                         }
 
-                        if (collision) break;
+                        if (collision) break; // End streamline permanently to avoid overlapping existing lines
 
-                        currentPath.push([R(nx), R(ny)]);
+                        // We still trace the spatial tracking grid so other lines don't collide here,
+                        // but we ONLY actively draw the vertex if its density score allows.
+                        // If it doesn't allow, we add a NaN break to force drawing a separate segment.
+                        if (lineScore < currentDensityThreshold) {
+                            currentPath.push([R(nx), R(ny)]);
+                        } else {
+                            if (currentPath.length > 0 && !isNaN(currentPath[currentPath.length - 1][0])) {
+                                currentPath.push([NaN, NaN]);
+                            }
+                        }
+
                         px = nx; py = ny;
                         prevDens = nDens;
                         prevAlpha = nAlpha;
@@ -742,14 +794,29 @@ export class ImageHatching {
                 }
 
                 if (pts.length > 2) {
-                    model.models![`hatch_stream_${lineIdCounter++}`] = new MakerJs.models.ConnectTheDots(false, pts);
+                    // Split the path by NaN breaks and emit sub-paths
+                    let currentSubPath: MakerJs.IPoint[] = [];
+                    for (const pt of pts) {
+                        if (isNaN(pt[0])) {
+                            if (currentSubPath.length > 1) {
+                                model.models![`hatch_stream_${lineIdCounter++}`] = new MakerJs.models.ConnectTheDots(false, currentSubPath);
+                            }
+                            currentSubPath = [];
+                        } else {
+                            currentSubPath.push(pt);
+                        }
+                    }
+                    if (currentSubPath.length > 1) {
+                        model.models![`hatch_stream_${lineIdCounter++}`] = new MakerJs.models.ConnectTheDots(false, currentSubPath);
+                    }
                 } else {
                     for (const c of cellClaims) spatialGrid[c] = 0;
                 }
             };
 
+            let seedLineId = 0;
             for (const s of seeds) {
-                traceStreamline(s.x, s.y);
+                traceStreamline(s.x, s.y, seedLineId++);
             }
 
             if (options.drawContour && boundary.length > 0) {
