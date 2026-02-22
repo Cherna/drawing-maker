@@ -188,15 +188,17 @@ function consolidateContinuousPaths(chains: MakerJs.IChain[], tolerance: number)
  */
 function collectOrphanedPaths(model: MakerJs.IModel, existingChains: MakerJs.IChain[]): MakerJs.IChain[] {
     const usedPaths = new Set<MakerJs.IPath>();
-    existingChains.forEach(chain => {
-        if (chain.links) {
-            chain.links.forEach(link => {
-                if (link.walkedPath && link.walkedPath.pathContext) {
-                    usedPaths.add(link.walkedPath.pathContext);
-                }
-            });
-        }
-    });
+    if (existingChains) {
+        existingChains.forEach(chain => {
+            if (chain.links) {
+                chain.links.forEach(link => {
+                    if (link.walkedPath && link.walkedPath.pathContext) {
+                        usedPaths.add(link.walkedPath.pathContext);
+                    }
+                });
+            }
+        });
+    }
 
     const orphans: MakerJs.IChain[] = [];
 
@@ -557,7 +559,7 @@ export function generateGCode(model: MakerJs.IModel, config: AppConfig, type: Po
         // toKeyPoints works correctly for both root paths and nested fill paths.
         MakerJs.model.originate(model);
 
-        let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
+        let chains = (MakerJs.model.findChains(model) || []) as MakerJs.IChain[];
 
         const orphans = collectOrphanedPaths(model, chains);
 
@@ -687,7 +689,7 @@ export function generateGCodeForLayers(
                 // Flatten all nested model origins into path coordinates before chain analysis.
                 MakerJs.model.originate(model);
 
-                let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
+                let chains = (MakerJs.model.findChains(model) || []) as MakerJs.IChain[];
                 const orphans = collectOrphanedPaths(model, chains);
 
 
@@ -778,7 +780,7 @@ export function computeGCodeStats(
 
     MakerJs.model.originate(model);
 
-    let chains = MakerJs.model.findChains(model) as MakerJs.IChain[];
+    let chains = (MakerJs.model.findChains(model) || []) as MakerJs.IChain[];
     const orphans = collectOrphanedPaths(model, chains);
 
     let optimizedChains: OptimizedChain[];

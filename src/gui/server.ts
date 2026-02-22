@@ -31,7 +31,7 @@ function createPreviewConfig(config: AppConfig): AppConfig {
 
     // Reduce resolution for preview
     if (previewConfig.params?.steps) {
-        previewConfig.params.steps.forEach((step: any) => {
+        previewConfig.params.steps?.forEach((step: any) => {
             if (step.tool === 'resample') {
                 if (step.params?.detail) {
                     // Lower detail for preview (less aggressive reduction)

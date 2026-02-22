@@ -8,6 +8,7 @@ import { NoisePatterns, NoiseParams } from '../lib/noise-patterns';
 import { Filling } from '../lib/filling';
 import { GCodeConfig } from '../types';
 import { ImageHatching } from './generators/image-hatching';
+import { ExperimentalHatching } from './generators/experimental-hatching';
 
 type GeneratorFn = (params: any, ctx: CanvasConfig, bounds: Box) => MakerJs.IModel | Promise<MakerJs.IModel>;
 type ModifierFn = (model: MakerJs.IModel, params: any, ctx: CanvasConfig, bounds: Box, mask?: (x: number, y: number) => number) => Promise<MakerJs.IModel | void> | MakerJs.IModel | void;
@@ -217,6 +218,10 @@ const GENERATORS: Record<string, GeneratorFn> = {
 
     'image-hatching': async (params, ctx, bounds) => {
         return ImageHatching.generate(bounds.width, bounds.height, params);
+    },
+
+    'experimental-hatching': async (params, ctx, bounds) => {
+        return ExperimentalHatching.generate(bounds.width, bounds.height, params);
     }
 };
 

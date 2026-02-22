@@ -361,7 +361,7 @@ export class ImageHatching {
             return hits;
         };
 
-        // â”€â”€ Raster Hatching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Raster Hatching ────────────────────────────────────────────────────────
         const runRasterHatching = (angleOffset: number, boundarySegs: Seg2D[] | null) => {
             const angle = baseAngleRad + angleOffset;
             const cosA = Math.cos(angle);
@@ -384,8 +384,6 @@ export class ImageHatching {
                 const stepX = 0.5;
 
                 // ── Determine active x-ranges for this scan line ──────────────
-                // If boundary segments are provided, use them for the clip; otherwise
-                // fall back to density threshold (old behaviour).
                 type Range = { xStart: number; xEnd: number };
                 const activeRanges: Range[] = [];
 
@@ -394,10 +392,6 @@ export class ImageHatching {
                     // Pair intersections: even-odd fill rule
                     for (let hi = 0; hi + 1 < hits.length; hi += 2) {
                         const xS = hits[hi], xE = hits[hi + 1];
-                        // Sanity-check: the midpoint of this range must lie inside the
-                        // shape (density < threshold). When the boundary is concave or
-                        // has tiny gaps, even-odd pairing can produce phantom outside
-                        // ranges; this check discards them.
                         const midX = (xS + xE) / 2;
                         const mwx = cx + midX * cosA - y * sinA;
                         const mwy = cy + midX * sinA + y * cosA;
@@ -405,6 +399,9 @@ export class ImageHatching {
                         if (!midInBounds || getDensity(mwx, mwy) >= threshold) continue;
                         activeRanges.push({ xStart: xS, xEnd: xE });
                     }
+                } else {
+                    // Fallback range if no boundary
+                    activeRanges.push({ xStart: xMin, xEnd: xMax });
                 }
 
                 // ── Emit hatch segments within each active range ──────────────
@@ -425,19 +422,16 @@ export class ImageHatching {
                         currentSegment = [];
                     };
 
-                    // Clip range endpoints to canvas and to xMin/xMax
                     const xStart = Math.max(xMin, range.xStart);
                     const xEnd = Math.min(xMax, range.xEnd);
+                    if (xStart >= xEnd) continue;
 
-                    // World-space coords of the exact boundary clip points.
-                    // When a segment starts or ends at a range edge, snap to these
-                    // exact positions so lines touch the contour precisely — not
-                    // to wherever the density threshold happened to cross.
                     const startWorldX = cx + xStart * cosA - y * sinA;
                     const startWorldY = cy + xStart * sinA + y * cosA;
                     const endWorldX = cx + xEnd * cosA - y * sinA;
                     const endWorldY = cy + xEnd * sinA + y * cosA;
 
+                    // Original Bucketing with fixed strict boundaries
                     let prevDens = 1.0;
                     let prevRx = startWorldX;
                     let prevRy = startWorldY;
@@ -445,15 +439,21 @@ export class ImageHatching {
                     let isFirstSample = true;
 
                     for (let x = xStart; x <= xEnd; x = Math.min(x + stepX, xEnd)) {
+                        const isExactBoundary = (x === xStart || x === xEnd);
                         const rx = cx + x * cosA - y * sinA;
                         const ry = cy + x * sinA + y * cosA;
                         const inBounds = rx >= 0 && rx <= width && ry >= 0 && ry <= height;
-                        const dens = inBounds ? getDensity(rx, ry) : 1.0;
+                        let densRaw = inBounds ? getDensity(rx, ry) : 1.0;
                         const alpha = inBounds ? getAlpha(rx, ry) : 0.0;
+                        const alphaOk = hasTransparency ? alpha >= 0.5 : true;
 
-                        let draw = false;
-                        if (inBounds && dens < threshold && (hasTransparency ? alpha >= 0.5 : true)) {
-                            const darkness = 1.0 - dens;
+                        if (!isExactBoundary && alphaOk && boundarySegs && boundarySegs.length > 0) {
+                            densRaw = Math.min(densRaw, threshold - 0.001);
+                        }
+
+                        const calculateDraw = (d: number): boolean => {
+                            if (!alphaOk || d >= threshold) return false;
+                            const darkness = 1.0 - d;
                             let normalizedDarkness = Math.max(0, darkness - (1.0 - threshold)) / threshold;
                             normalizedDarkness = Math.min(1.0, Math.pow(normalizedDarkness, densityCurve));
                             const bucketIndex = Math.floor(normalizedDarkness * (steps - 0.001));
@@ -465,41 +465,46 @@ export class ImageHatching {
                                 else { const h = Math.sin((bucketIndex + 1) * 123.456) * 10000; isSwitched = (h - Math.floor(h)) < chance; }
                             }
 
-                            let shouldDrawPass = false;
                             const isAltPass = Math.abs(angleOffset) > 0.01;
-                            if (options.crossHatch) shouldDrawPass = true;
-                            else shouldDrawPass = isAltPass ? isSwitched : !isSwitched;
+                            const shouldDrawPass = options.crossHatch ? true : (isAltPass ? isSwitched : !isSwitched);
 
                             if (shouldDrawPass) {
-                                // Cap at 2^4 = 16 so adding more steps never makes light
-                                // areas absurdly sparse (spacing would otherwise grow as 2^(steps-1)).
                                 const spacing = 1 << Math.max(0, Math.min(4, steps - 1 - bucketIndex));
-                                if (lineIndex % spacing === 0) {
-                                    draw = true;
-                                }
+                                if (lineIndex % spacing === 0) return true;
                             }
-                        }
+                            return false;
+                        };
+
+                        const draw = calculateDraw(densRaw);
 
                         if (isFirstSample) {
                             isFirstSample = false;
                             if (draw) {
-                                // Snap start to exact boundary clip point
                                 currentSegment = [[R(startWorldX), R(startWorldY)]];
                             }
                         } else {
                             if (draw && !prevDraw) {
-                                let sRx = rx, sRy = ry;
-                                if (prevDens >= threshold && dens < threshold && dens !== prevDens) {
-                                    const t = (threshold - prevDens) / (dens - prevDens);
-                                    sRx = prevRx + t * (rx - prevRx); sRy = prevRy + t * (ry - prevRy);
+                                let tLow = 0, tHigh = 1.0;
+                                for (let i = 0; i < 5; i++) {
+                                    const tm = (tLow + tHigh) / 2;
+                                    const mDens = prevDens + tm * (densRaw - prevDens);
+                                    if (calculateDraw(mDens)) tHigh = tm; else tLow = tm;
                                 }
+                                const t = (tLow + tHigh) / 2;
+                                const sRx = prevRx + t * (rx - prevRx);
+                                const sRy = prevRy + t * (ry - prevRy);
                                 currentSegment = [[R(sRx), R(sRy)]];
                             } else if (!draw && prevDraw) {
-                                let eRx = prevRx, eRy = prevRy;
-                                if (prevDens < threshold && dens >= threshold && dens !== prevDens) {
-                                    const t = (threshold - prevDens) / (dens - prevDens);
-                                    eRx = prevRx + t * (rx - prevRx); eRy = prevRy + t * (ry - prevRy);
+                                let tLow = 0, tHigh = 1.0;
+                                for (let i = 0; i < 5; i++) {
+                                    const tm = (tLow + tHigh) / 2;
+                                    const mDens = prevDens + tm * (densRaw - prevDens);
+                                    if (calculateDraw(mDens)) tLow = tm; else tHigh = tm;
                                 }
+                                const t = (tLow + tHigh) / 2;
+                                const eRx = prevRx + t * (rx - prevRx);
+                                const eRy = prevRy + t * (ry - prevRy);
+
                                 if (currentSegment.length >= 1) {
                                     if (currentSegment.length === 1) currentSegment.push([R(eRx), R(eRy)]);
                                     else currentSegment[1] = [R(eRx), R(eRy)];
@@ -512,94 +517,12 @@ export class ImageHatching {
                         }
 
                         if (x === xEnd) break;
-                        prevDens = dens; prevRx = rx; prevRy = ry; prevDraw = draw;
+                        prevDens = densRaw; prevRx = rx; prevRy = ry; prevDraw = draw;
                     }
 
                     if (prevDraw && currentSegment.length >= 1) {
-                        // Snap end to exact boundary clip point
                         if (currentSegment.length === 1) currentSegment.push([R(endWorldX), R(endWorldY)]);
                         else currentSegment[1] = [R(endWorldX), R(endWorldY)];
-                        emitSeg();
-                    }
-                }
-
-                // ── Fallback: no boundary — use density threshold scan ──────────
-                if (!boundarySegs || boundarySegs.length === 0) {
-                    let prevDens = 1.0;
-                    let prevAlpha = 0.0;
-                    let prevRx = cx + xMin * cosA - y * sinA;
-                    let prevRy = cy + xMin * sinA + y * cosA;
-                    let prevDraw = false;
-                    let currentSegment: MakerJs.IPoint[] = [];
-
-                    const emitSeg = () => {
-                        if (currentSegment.length === 2) {
-                            const len = Math.hypot(currentSegment[0][0] - currentSegment[1][0], currentSegment[0][1] - currentSegment[1][1]);
-                            if (len > 0.01) {
-                                model.models![`hatch_${angleOffset}_${lineIdCounter++}`] =
-                                    new MakerJs.models.ConnectTheDots(false, [...currentSegment]);
-                            }
-                        }
-                        currentSegment = [];
-                    };
-
-                    for (let x = xMin; x <= xMax; x += stepX) {
-                        const rx = cx + x * cosA - y * sinA;
-                        const ry = cy + x * sinA + y * cosA;
-                        const inBounds = rx >= 0 && rx <= width && ry >= 0 && ry <= height;
-                        const dens = inBounds ? getDensity(rx, ry) : 1.0;
-                        const alpha = inBounds ? getAlpha(rx, ry) : 0.0;
-                        let draw = false;
-                        if (inBounds && dens < threshold && (hasTransparency ? alpha >= 0.5 : true)) {
-                            const darkness = 1.0 - dens;
-                            let nd = Math.max(0, darkness - (1.0 - threshold)) / threshold;
-                            nd = Math.min(1.0, Math.pow(nd, densityCurve));
-                            const bi = Math.floor(nd * (steps - 0.001));
-                            let sw = false;
-                            const ch = options.crossHatchChance || 0;
-                            if (ch > 0) { if (ch >= 1) sw = (bi % 2 === 1); else { const h = Math.sin((bi + 1) * 123.456) * 10000; sw = (h - Math.floor(h)) < ch; } }
-                            let sdp = false;
-                            const alt = Math.abs(angleOffset) > 0.01;
-                            if (options.crossHatch) sdp = true; else sdp = alt ? sw : !sw;
-                            if (sdp) {
-                                const spacing = 1 << Math.max(0, Math.min(4, steps - 1 - bi));
-                                if (lineIndex % spacing === 0) {
-                                    draw = true;
-                                }
-                            }
-                        }
-                        if (draw && !prevDraw) {
-                            let sRx = rx, sRy = ry;
-                            if (hasTransparency && prevAlpha < 0.5 && alpha >= 0.5 && alpha !== prevAlpha) {
-                                const t = (0.5 - prevAlpha) / (alpha - prevAlpha);
-                                sRx = prevRx + t * (rx - prevRx); sRy = prevRy + t * (ry - prevRy);
-                            } else if (prevDens >= threshold && dens < threshold && dens !== prevDens) {
-                                const t = (threshold - prevDens) / (dens - prevDens);
-                                sRx = prevRx + t * (rx - prevRx); sRy = prevRy + t * (ry - prevRy);
-                            }
-                            currentSegment = [[R(sRx), R(sRy)]];
-                        } else if (!draw && prevDraw) {
-                            let eRx = prevRx, eRy = prevRy;
-                            if (hasTransparency && prevAlpha >= 0.5 && alpha < 0.5 && alpha !== prevAlpha) {
-                                const t = (0.5 - prevAlpha) / (alpha - prevAlpha);
-                                eRx = prevRx + t * (rx - prevRx); eRy = prevRy + t * (ry - prevRy);
-                            } else if (prevDens < threshold && dens >= threshold && dens !== prevDens) {
-                                const t = (threshold - prevDens) / (dens - prevDens);
-                                eRx = prevRx + t * (rx - prevRx); eRy = prevRy + t * (ry - prevRy);
-                            }
-                            if (currentSegment.length >= 1) {
-                                if (currentSegment.length === 1) currentSegment.push([R(eRx), R(eRy)]);
-                                else currentSegment[1] = [R(eRx), R(eRy)];
-                            }
-                            emitSeg();
-                        } else if (draw) {
-                            if (currentSegment.length === 1) currentSegment.push([R(rx), R(ry)]);
-                            else currentSegment[1] = [R(rx), R(ry)];
-                        }
-                        prevDens = dens; prevAlpha = alpha; prevRx = rx; prevRy = ry; prevDraw = draw;
-                    }
-                    if (prevDraw && currentSegment.length >= 1) {
-                        if (currentSegment.length === 1) currentSegment.push([R(prevRx), R(prevRy)]);
                         emitSeg();
                     }
                 }
@@ -836,35 +759,7 @@ export class ImageHatching {
             }
         };
 
-        // DEBUG: Comprehensive pixel stats
-        {
-            const ch = rawDensity.info.channels;
-            let transparent = 0, dark = 0, light = 0, total = dWidth * dHeight;
-            let minAlpha = 255, maxAlpha = 0;
-            let minR = 255, maxR = 0;
-            // Scan every 10th pixel for speed
-            for (let py = 0; py < dHeight; py += 10) {
-                for (let px = 0; px < dWidth; px += 10) {
-                    const idx = (py * dWidth + px) * ch;
-                    const r = dData[idx], g = dData[idx + 1], b = dData[idx + 2], a = dData[idx + 3];
-                    if (a < minAlpha) minAlpha = a;
-                    if (a > maxAlpha) maxAlpha = a;
-                    if (r < minR) minR = r;
-                    if (r > maxR) maxR = r;
-                    if (a === 0) transparent++;
-                    const luma = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
-                    if (luma < 0.5) dark++; else light++;
-                }
-            }
-            const sampled = Math.ceil(dWidth / 10) * Math.ceil(dHeight / 10);
-            // Also scan the alpha channel for a row through the middle
-            const midRow = Math.floor(dHeight / 2);
-            const alphaSlice: number[] = [];
-            for (let px = 0; px < dWidth; px += Math.max(1, Math.floor(dWidth / 40))) {
-                const idx = (midRow * dWidth + px) * ch;
-                alphaSlice.push(dData[idx + 3]);
-            }
-        }
+        // Pixel stats debugging block was here and has been removed.
 
         if (options.normalMap) {
             runStreamlineHatching();

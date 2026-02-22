@@ -47,6 +47,7 @@ This document defines the standard operating procedures (Skills) for working in 
 1.  **Strict Typing**: Avoid `any`. Define interfaces for options objects.
 2.  **Math**: Use the `NoisePatterns` class for all random/noise generation to ensure seeded reproducibility.
 3.  **MakerJS**: Use `MakerJs.IModel` for grouping geometry. Use `model.paths` for actual lines.
+4.  **Comments**: Write strictly human-readable comments. **DO NOT** use special ASCII/UTF-8 box-drawing characters or non-standard symbols (e.g., `├`, `─`, `┌`, `└`) for visual formatting or section breaks. Use simple text markers (e.g., `----` or `====`).
 
 ## Skill: Debugging
 

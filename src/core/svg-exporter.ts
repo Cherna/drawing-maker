@@ -56,14 +56,67 @@ function walkAllPaths(
     model: MakerJs.IModel,
     canvasHeight: number,
     pathProcessor: (path: MakerJs.IPath, offsetX: number, offsetY: number, canvasHeight: number, lines: string[]) => void
-): { normal: string[]; hatch: string[] } {
+): { normal: string[]; hatch: string[]; filled: string[]; rasters: string[] } {
     const normal: string[] = [];
     const hatch: string[] = [];
+    const filled: string[] = [];
+    const rasters: string[] = [];
 
     function walkModel(m: MakerJs.IModel, offsetX: number = 0, offsetY: number = 0, insideHatch: boolean = false) {
         const modelOrigin = m.origin || [0, 0];
         const newOffsetX = offsetX + modelOrigin[0];
         const newOffsetY = offsetY + modelOrigin[1];
+
+        if (m.layer === 'raster') {
+            const rd = (m as any).rasterData;
+            if (rd && rd.base64) {
+                const rx = (rd.x + newOffsetX).toFixed(3);
+                // The pseudo-model `rasterData.y` is from the bottom-left cartesian coordinate system.
+                // Re-flip for SVG top-down rendering.
+                const ry = (canvasHeight - (rd.y + newOffsetY + rd.height)).toFixed(3);
+                const rw = rd.width.toFixed(3);
+                const rh = rd.height.toFixed(3);
+                rasters.push(`<image x="${rx}" y="${ry}" width="${rw}" height="${rh}" preserveAspectRatio="none" href="${rd.base64}" />`);
+            }
+            return;
+        }
+
+        if (m.layer === 'filled') {
+            const chains = MakerJs.model.findChains(m) || [];
+            if (chains && Array.isArray(chains) && chains.length > 0) {
+                for (const chain of chains as MakerJs.IChain[]) {
+                    const points = MakerJs.chain.toPoints(chain, 1);
+                    if (points && points.length > 2) {
+                        const svgPoints = points.map(p => {
+                            const x = (p[0] + newOffsetX).toFixed(3);
+                            const y = (canvasHeight - (p[1] + newOffsetY)).toFixed(3);
+                            return `${x},${y}`;
+                        });
+                        // SVG path string representation of a filled polygon
+                        const d = `M ${svgPoints[0]} L ${svgPoints.slice(1).join(' L ')} Z`;
+                        // Output to the 'filled' collection
+                        filled.push(`<path d="${d}" stroke="none" fill="currentColor" />`);
+                    }
+                }
+            } else if (m.paths) {
+                // Connecting lines manually fallback if it's not a chain
+                const dList: string[] = [];
+                for (const p of Object.values(m.paths)) {
+                    if (p.type === 'line') {
+                        const l = p as MakerJs.IPathLine;
+                        const x1 = (l.origin[0] + newOffsetX).toFixed(3);
+                        const y1 = (canvasHeight - (l.origin[1] + newOffsetY)).toFixed(3);
+                        const x2 = (l.end[0] + newOffsetX).toFixed(3);
+                        const y2 = (canvasHeight - (l.end[1] + newOffsetY)).toFixed(3);
+                        dList.push(`M ${x1},${y1} L ${x2},${y2}`);
+                    }
+                }
+                if (dList.length > 0) {
+                    filled.push(`<path d="${dList.join(' ')}" stroke="none" fill="currentColor" fill-rule="evenodd" />`);
+                }
+            }
+            // Do not return here, allow normal stroke paths to be extracted too.
+        }
 
         if (m.paths) {
             const target = insideHatch ? hatch : normal;
@@ -80,7 +133,7 @@ function walkAllPaths(
     }
 
     walkModel(model);
-    return { normal, hatch };
+    return { normal, hatch, filled, rasters };
 }
 
 /**
@@ -88,13 +141,19 @@ function walkAllPaths(
  * MakerJs.exporter.toSVG auto-shifts coordinates to (0,0) which breaks our centering.
  */
 export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string {
-    const { normal, hatch } = walkAllPaths(model, canvas.height, processPathToLines);
+    const { normal, hatch, filled, rasters } = walkAllPaths(model, canvas.height, processPathToLines);
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
      width="${canvas.width}mm" 
      height="${canvas.height}mm" 
      viewBox="0 0 ${canvas.width} ${canvas.height}"
      style="background-color: #FAF8F3;">
+  <g id="rasters">
+    ${rasters.join('\n    ')}
+  </g>
+  <g fill="#444" opacity="0.8">
+    ${filled.join('\n    ')}
+  </g>
   <g stroke="#000" stroke-width="0.25" fill="none" stroke-linecap="round">
     ${normal.join('\n    ')}
   </g>
@@ -117,8 +176,9 @@ export function modelToSVGWithColor(
     opacity: number = 1.0,
     strokeWidth: number = 0.25
 ): string {
-    const { normal, hatch } = walkAllPaths(model, canvas.height, processPathToLines);
+    const { normal, hatch, filled, rasters } = walkAllPaths(model, canvas.height, processPathToLines);
     const opacityAttr = opacity < 1.0 ? ` stroke-opacity="${opacity.toFixed(2)}"` : '';
+    const fillOpacityAttr = opacity < 1.0 ? ` opacity="${opacity.toFixed(2)}"` : '';
     const hatchStrokeWidth = Math.max(0.05, strokeWidth * 0.3);
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
@@ -126,6 +186,12 @@ export function modelToSVGWithColor(
      height="${canvas.height}mm" 
      viewBox="0 0 ${canvas.width} ${canvas.height}"
      style="background-color: #FAF8F3;">
+  <g id="rasters">
+    ${rasters.join('\n    ')}
+  </g>
+  <g fill="${color}"${fillOpacityAttr}>
+    ${filled.join('\n    ')}
+  </g>
   <g stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
     ${normal.join('\n    ')}
   </g>
@@ -155,11 +221,18 @@ export function layersToSVG(
     // Process each layer
     for (const [layerId, data] of layerData.entries()) {
         const { model, color, opacity = 1.0, strokeWidth = 0.25 } = data;
-        const { normal, hatch } = walkAllPaths(model, canvasHeight, processPathToLines);
+        const { normal, hatch, filled, rasters } = walkAllPaths(model, canvasHeight, processPathToLines);
         const opacityAttr = opacity < 1.0 ? ` stroke-opacity="${opacity.toFixed(2)}"` : '';
+        const fillOpacityAttr = opacity < 1.0 ? ` opacity="${opacity.toFixed(2)}"` : '';
         const hatchStrokeWidth = Math.max(0.05, strokeWidth * 0.3);
 
-        layerGroups.push(`  <g id="${layerId}" stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
+        layerGroups.push(`  <g id="${layerId}_rasters">
+${rasters.join('\n')}
+  </g>
+  <g id="${layerId}_fill" fill="${color}"${fillOpacityAttr}>
+${filled.join('\n')}
+  </g>
+  <g id="${layerId}" stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
 ${normal.join('\n')}
   </g>
   <g id="${layerId}_hatch" stroke="#888" stroke-width="${hatchStrokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
