@@ -18,6 +18,9 @@ export class ImageHatchingParams {
     densityCurve?: number;   // gamma exponent for the period curve (1=linear, <1=more dense darks, >1=sparser)
     drawContour?: boolean;   // trace the boundary of dark regions as a line
     contourThreshold?: number; // brightness cutoff for contour detection (default = same as threshold)
+    blur?: number;
+    minAlpha?: number;
+    maxAlpha?: number;
 }
 
 export class ImageHatching {
@@ -38,7 +41,11 @@ export class ImageHatching {
         // can preserve it, causing transparent pixels to become opaque black.
         // Grayscale is computed manually via the luma formula in getDensity().
         // Force RGBA (4 channels) so channel indexing is always predictable.
-        const densitySharp = sharp(imageBuffer);
+        let densitySharp = sharp(imageBuffer);
+        if (options.blur && options.blur > 0) {
+            densitySharp = densitySharp.blur(options.blur);
+        }
+
         const rawDensity = await densitySharp
             .toColorspace('srgb')
             .ensureAlpha()
@@ -76,18 +83,30 @@ export class ImageHatching {
         {
             const ch = rawDensity.info.channels;
             let minAlpha = 255;
-            for (let py = 0; py < dHeight; py += 10) {
-                for (let px = 0; px < dWidth; px += 10) {
-                    const idx = (py * dWidth + px) * ch;
-                    if (ch >= 4) {
-                        const a = dData[idx + 3];
-                        if (a < minAlpha) minAlpha = a;
-                    } else if (ch === 2) {
-                        const a = dData[idx + 1];
-                        if (a < minAlpha) minAlpha = a;
+            // Check all edge pixels first, then a coarse grid, to reliably detect transparency
+            // Testing every pixel is too slow for large images
+            const checkPixel = (px: number, py: number) => {
+                const idx = (py * dWidth + px) * ch;
+                if (ch >= 4) {
+                    if (dData[idx + 3] < minAlpha) minAlpha = dData[idx + 3];
+                } else if (ch === 2) {
+                    if (dData[idx + 1] < minAlpha) minAlpha = dData[idx + 1];
+                }
+            };
+
+            // Check edges
+            for (let px = 0; px < dWidth; px++) { checkPixel(px, 0); checkPixel(px, dHeight - 1); }
+            for (let py = 0; py < dHeight; py++) { checkPixel(0, py); checkPixel(dWidth - 1, py); }
+
+            // coarse grid
+            if (minAlpha === 255) {
+                for (let py = 0; py < dHeight; py += 10) {
+                    for (let px = 0; px < dWidth; px += 10) {
+                        checkPixel(px, py);
                     }
                 }
             }
+
             if (minAlpha < 255) hasTransparency = true;
         }
 
@@ -246,6 +265,9 @@ export class ImageHatching {
         const baseMinSpacing = 1.0;
         const minSpacing = baseMinSpacing / densityMultiplier;
 
+        const minAlpha = options.minAlpha ?? 0.5;
+        const maxAlpha = options.maxAlpha ?? 1.0;
+
         // densityCurve: gamma exponent applied to the normalised darkness before mapping to density
         // <1 = more lines in dark areas (emphasises darks), >1 = sparsely spaced (emphasises lights)
         const densityCurve = Math.max(0.1, options.densityCurve ?? 1.0);
@@ -272,10 +294,15 @@ export class ImageHatching {
                     const x = c * step;
                     let v = -1;
                     if (x >= 0 && x <= width && y >= 0 && y <= height) {
+                        const rDens = getDensity(x, y);
+                        const rAlpha = getAlpha(x, y);
+
                         if (hasTransparency) {
-                            v = getAlpha(x, y) - 0.5;
+                            if (rAlpha >= minAlpha && rAlpha <= maxAlpha) {
+                                v = bThresh - rDens;
+                            }
                         } else {
-                            v = bThresh - getDensity(x, y);
+                            v = bThresh - rDens;
                         }
                     }
                     if (v === 0) v = 1e-9;
@@ -405,6 +432,8 @@ export class ImageHatching {
                 }
 
                 // ── Emit hatch segments within each active range ──────────────
+                const scanLineSegments: MakerJs.IPoint[][] = [];
+
                 for (const range of activeRanges) {
                     let currentSegment: MakerJs.IPoint[] = [];
 
@@ -415,8 +444,7 @@ export class ImageHatching {
                                 currentSegment[0][1] - currentSegment[1][1]
                             );
                             if (len > 0.01) {
-                                model.models![`hatch_${angleOffset}_${lineIdCounter++}`] =
-                                    new MakerJs.models.ConnectTheDots(false, [...currentSegment]);
+                                scanLineSegments.push([...currentSegment]);
                             }
                         }
                         currentSegment = [];
@@ -445,7 +473,7 @@ export class ImageHatching {
                         const inBounds = rx >= 0 && rx <= width && ry >= 0 && ry <= height;
                         let densRaw = inBounds ? getDensity(rx, ry) : 1.0;
                         const alpha = inBounds ? getAlpha(rx, ry) : 0.0;
-                        const alphaOk = hasTransparency ? alpha >= 0.5 : true;
+                        const alphaOk = hasTransparency ? (alpha >= minAlpha && alpha <= maxAlpha) : true;
 
                         if (!isExactBoundary && alphaOk && boundarySegs && boundarySegs.length > 0) {
                             densRaw = Math.min(densRaw, threshold - 0.001);
@@ -526,6 +554,20 @@ export class ImageHatching {
                         emitSeg();
                     }
                 }
+
+                // Apply Boustrophedon ordering for alternating scan lines
+                if (scanLineSegments.length > 0) {
+                    let segmentsToAdd = [...scanLineSegments];
+
+                    if (lineIndex % 2 !== 0) {
+                        segmentsToAdd = scanLineSegments.map(seg => [...seg].reverse()).reverse();
+                    }
+
+                    for (const segment of segmentsToAdd) {
+                        model.models![`hatch_${angleOffset}_${lineIdCounter++}`] =
+                            new MakerJs.models.ConnectTheDots(false, segment);
+                    }
+                }
             }
         };
 
@@ -570,7 +612,8 @@ export class ImageHatching {
             const traceStreamline = (startX: number, startY: number, lineId: number) => {
                 const startDens = getDensity(startX, startY);
                 const startAlpha = getAlpha(startX, startY);
-                if (startDens >= threshold || (hasTransparency && startAlpha < 0.5)) return; // Started in empty space
+                const startAlphaOk = hasTransparency ? (startAlpha >= minAlpha && startAlpha <= maxAlpha) : true;
+                if (startDens >= threshold || !startAlphaOk) return; // Started in empty space
 
                 const getClearanceForDensity = (dens: number): number => {
                     const darkness = 1.0 - dens;
@@ -648,7 +691,7 @@ export class ImageHatching {
                         if (nx < 0 || nx > width || ny < 0 || ny > height) break;
                         const nDens = getDensity(nx, ny);
                         const nAlpha = getAlpha(nx, ny);
-                        const isInside = hasTransparency ? (nAlpha >= 0.5) : true;
+                        const isInside = hasTransparency ? (nAlpha >= minAlpha && nAlpha <= maxAlpha) : true;
 
                         if (!isInside || nDens >= threshold) {
                             if (hasTransparency && !isInside && nAlpha !== prevAlpha) {

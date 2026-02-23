@@ -146,6 +146,29 @@ export default function LayersEditor() {
     });
   };
 
+  const handleDuplicateStep = (index: number) => {
+    const updatedLayers = layers.map(layer => {
+      if (layer.id === activeLayerId) {
+        const newSteps = [...layer.steps];
+        const stepToDuplicate = newSteps[index];
+        // Deep clone the step to avoid reference issues
+        const duplicatedStep = JSON.parse(JSON.stringify(stepToDuplicate));
+        newSteps.splice(index + 1, 0, duplicatedStep);
+        return { ...layer, steps: newSteps };
+      }
+      return layer;
+    });
+
+    const flatSteps = layersToSteps(updatedLayers);
+    updateConfig({
+      params: {
+        ...config.params,
+        layers: updatedLayers,
+        steps: flatSteps,
+      }
+    });
+  };
+
   const handleMoveStep = (fromIndex: number, toIndex: number) => {
     const updatedLayers = layers.map(layer => {
       if (layer.id === activeLayerId) {
@@ -499,6 +522,7 @@ export default function LayersEditor() {
                   layerId={activeLayerId}
                   onUpdate={handleUpdateStep}
                   onRemove={handleRemoveStep}
+                  onDuplicate={handleDuplicateStep}
                   onMove={handleMoveStep}
                   canMoveUp={index > 0}
                   canMoveDown={index < pipelineSteps.length - 1}
