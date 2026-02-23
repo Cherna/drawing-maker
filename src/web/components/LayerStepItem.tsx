@@ -5,7 +5,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from './ui/select';
 import { PipelineStep } from '../../types';
 import { TOOL_DEFINITIONS, GENERATORS, MODIFIERS } from '../lib/tool-definitions';
 import StepParams from './StepParams';
-import { X, ChevronUp, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, ChevronRight, Eye, EyeOff, Copy } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface LayerStepItemProps {
@@ -14,6 +14,7 @@ interface LayerStepItemProps {
   layerId: string;
   onUpdate: (index: number, updates: Partial<PipelineStep>) => void;
   onRemove: (index: number) => void;
+  onDuplicate: (index: number) => void;
   onMove: (fromIndex: number, toIndex: number) => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -24,6 +25,7 @@ export default function LayerStepItem({
   index,
   onUpdate,
   onRemove,
+  onDuplicate,
   onMove,
   canMoveUp,
   canMoveDown,
@@ -122,6 +124,15 @@ export default function LayerStepItem({
                 <ChevronDown className="h-3 w-3" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={() => onDuplicate(index)}
+              title="Duplicate step"
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"

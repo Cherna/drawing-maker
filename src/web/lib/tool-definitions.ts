@@ -203,6 +203,9 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'densityCurve', label: 'Density Curve', type: 'number', min: 0.1, max: 3, step: 0.1, default: 1 },
       { key: 'drawContour', label: 'Draw Contour', type: 'boolean', default: false },
       { key: 'contourThreshold', label: 'Contour Threshold', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5 },
+      { key: 'blur', label: 'Blur (Fuzziness)', type: 'number', min: 0, max: 20, step: 0.5, default: 0 },
+      { key: 'minAlpha', label: 'Min Alpha', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5 },
+      { key: 'maxAlpha', label: 'Max Alpha', type: 'number', min: 0, max: 1, step: 0.05, default: 1.0 },
     ],
   },
   'experimental-hatching': {
