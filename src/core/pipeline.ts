@@ -685,17 +685,11 @@ export class Pipeline {
                 const model = await GENERATORS[step.tool](stepParams, ctx, localBounds);
 
                 if (currentModel) {
-                    // Combine models by merging their paths/models
-                    // Bake origins to preserve relative positions
-                    MakerJs.model.originate(currentModel, [0, 0]);
-                    MakerJs.model.originate(model, [0, 0]);
-
-                    const combined: MakerJs.IModel = { paths: {}, models: {} };
-                    if (currentModel.paths) Object.assign(combined.paths!, currentModel.paths);
-                    if (currentModel.models) Object.assign(combined.models!, currentModel.models);
-                    if (model.paths) Object.assign(combined.paths!, model.paths);
-                    if (model.models) Object.assign(combined.models!, model.models);
-                    currentModel = combined;
+                    // Combine models by adding the new one as a unique sub-model.
+                    // This prevents key collisions (e.g., from multiple hatching passes).
+                    if (!currentModel.models) currentModel.models = {};
+                    const stepId = `step_${steps.indexOf(step)}_${step.tool}`;
+                    currentModel.models[stepId] = model;
                 } else {
                     currentModel = model;
                 }

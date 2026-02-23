@@ -564,7 +564,7 @@ export class ImageHatching {
                     }
 
                     for (const segment of segmentsToAdd) {
-                        model.models![`hatch_${angleOffset}_${lineIdCounter++}`] =
+                        model.models![`hatch_${angleOffset}_L${lineIndex}_${lineIdCounter++}`] =
                             new MakerJs.models.ConnectTheDots(false, segment);
                     }
                 }
