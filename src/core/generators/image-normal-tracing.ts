@@ -20,6 +20,8 @@ export class ImageNormalTracingParams {
     blur?: number;
     minAlpha?: number;
     maxAlpha?: number;
+    flowSmoothing?: number;
+    seedingMode?: 'grid' | 'random' | 'blue-noise';
 }
 
 export class ImageNormalTracing {
@@ -55,7 +57,13 @@ export class ImageNormalTracing {
         let rawNormal: { data: Buffer, info: sharp.OutputInfo } | null = null;
         if (options.normalMap) {
             const b64Norm = options.normalMap.replace(/^data:image\/\w+;base64,/, "");
-            rawNormal = await sharp(Buffer.from(b64Norm, 'base64'))
+            let normalSharp = sharp(Buffer.from(b64Norm, 'base64'));
+
+            if (options.flowSmoothing && options.flowSmoothing > 0) {
+                normalSharp = normalSharp.blur(options.flowSmoothing);
+            }
+
+            rawNormal = await normalSharp
                 .toColorspace('srgb')
                 .ensureAlpha()
                 .raw()
@@ -194,9 +202,6 @@ export class ImageNormalTracing {
                 const idx = (by * nWidth + bx) * nChannels;
                 const snx = (nData[idx] / 255) * 2.0 - 1.0;
                 let sny = (nData[idx + 1] / 255) * 2.0 - 1.0;
-                // Normal maps in some apps use Y-up (OpenGL) vs Y-down (DirectX).
-                // Our Cartesian system is Y-up. Buffer is Y-down. 
-                // We keep it simple: flip Y based on common normal map conventions if needed.
                 return { nx: snx, ny: sny };
             };
             const x0 = Math.floor(fx);
@@ -258,9 +263,6 @@ export class ImageNormalTracing {
                 const initialDens = getDensity(sx, sy);
                 if (initialDens >= threshold) return [];
 
-                let lastDens = initialDens;
-                let lastAlpha = getAlpha(sx, sy);
-
                 for (let i = 0; i < 1500; i++) {
                     let flow = getTangent(px, py);
                     if (!flow) flow = { vx: Math.cos(baseAngleRad), vy: Math.sin(baseAngleRad) };
@@ -293,15 +295,14 @@ export class ImageNormalTracing {
                     if (nDens >= threshold || !alphaOk) break;
 
                     const clearanceCells = getClearanceForDensity(nDens);
-                    const SEARCH_LIMIT = 24; // Increase limit for sparse areas
+                    const SEARCH_LIMIT = 24;
                     const R_SEARCH = Math.max(1, Math.min(SEARCH_LIMIT, Math.ceil(clearanceCells)));
                     const R2 = clearanceCells * clearanceCells;
 
                     let collision = false;
                     search: for (let dr = -R_SEARCH; dr <= R_SEARCH; dr++) {
                         for (let dc = -R_SEARCH; dc <= R_SEARCH; dc++) {
-                            const d2 = dr * dr + dc * dc;
-                            if (d2 <= R2) {
+                            if (dr * dr + dc * dc <= R2) {
                                 const cId = getCell(nx + dc * cellSize, ny + dr * cellSize);
                                 if (cId >= 0 && spatialGrid[cId] !== 0 && !currentLineCells.has(cId)) {
                                     collision = true; break search;
@@ -312,7 +313,7 @@ export class ImageNormalTracing {
                     if (collision) break;
 
                     path.push([R(nx), R(ny)]);
-                    px = nx; py = ny; prevFlow = flowMid; lastDens = nDens; lastAlpha = nAlpha;
+                    px = nx; py = ny; prevFlow = flowMid;
 
                     const cId = getCell(px, py);
                     if (cId >= 0) {
@@ -324,17 +325,107 @@ export class ImageNormalTracing {
             };
 
             const seedSpacing = Math.max(minSpacing, 2.0);
-            const seeds: { x: number, y: number }[] = [];
-            for (let sy = 0; sy < height; sy += seedSpacing) {
-                const xOffset = (Math.floor(sy / seedSpacing) % 2) * (seedSpacing / 2);
-                for (let sx = xOffset; sx < width; sx += seedSpacing) {
-                    seeds.push({ x: sx, y: sy });
+            let seeds: { x: number, y: number }[] = [];
+
+            const mode = options.seedingMode || 'grid';
+
+            if (mode === 'blue-noise') {
+                // Bridson's Algorithm for Poisson Disk Sampling (O(N))
+                const radius = seedSpacing;
+                const radius2 = radius * radius;
+                const cellSizeBN = radius / Math.sqrt(2);
+                const gridW = Math.ceil(width / cellSizeBN);
+                const gridH = Math.ceil(height / cellSizeBN);
+                const pnGrid = new Int32Array(gridW * gridH).fill(-1);
+
+                const active: number[] = [];
+                const addPoint = (pt: { x: number, y: number }) => {
+                    const idx = seeds.length;
+                    seeds.push(pt);
+                    active.push(idx);
+                    const gx = Math.floor(pt.x / cellSizeBN);
+                    const gy = Math.floor(pt.y / cellSizeBN);
+                    pnGrid[gy * gridW + gx] = idx;
+                };
+
+                // Seed first point in a dark area if possible
+                let foundStart = false;
+                for (let attempts = 0; attempts < 100; attempts++) {
+                    const startX_ = Math.random() * width;
+                    const startY_ = Math.random() * height;
+                    if (getDensity(startX_, startY_) < threshold) {
+                        addPoint({ x: startX_, y: startY_ });
+                        foundStart = true;
+                        break;
+                    }
                 }
-            }
-            // Shuffle seeds loosely
-            for (let i = seeds.length - 1; i > 0; i--) {
-                const j = Math.abs(Math.sin(i)) * seeds.length | 0;
-                [seeds[i], seeds[j % seeds.length]] = [seeds[j % seeds.length], seeds[i]];
+                if (!foundStart) addPoint({ x: width / 2, y: height / 2 });
+
+                const k = 30; // Max attempts per active point
+                while (active.length > 0) {
+                    const randIdx = Math.floor(Math.random() * active.length);
+                    const pIdx = active[randIdx];
+                    const p = seeds[pIdx];
+                    let found = false;
+
+                    for (let i = 0; i < k; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = radius + Math.random() * radius;
+                        const nx = p.x + Math.cos(angle) * dist;
+                        const ny = p.y + Math.sin(angle) * dist;
+
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            // Density check: skip seeding in very bright areas to optimize
+                            if (getDensity(nx, ny) >= threshold) continue;
+
+                            const gx = Math.floor(nx / cellSizeBN);
+                            const gy = Math.floor(ny / cellSizeBN);
+                            let tooClose = false;
+
+                            // Check 5x5 neighborhood in Bridson grid
+                            checkNeighbors: for (let dy = -2; dy <= 2; dy++) {
+                                for (let dx = -2; dx <= 2; dx++) {
+                                    const cx = gx + dx;
+                                    const cy = gy + dy;
+                                    if (cx >= 0 && cx < gridW && cy >= 0 && cy < gridH) {
+                                        const neighborIdx = pnGrid[cy * gridW + cx];
+                                        if (neighborIdx !== -1) {
+                                            const s = seeds[neighborIdx];
+                                            const d2 = (nx - s.x) ** 2 + (ny - s.y) ** 2;
+                                            if (d2 < radius2) { tooClose = true; break checkNeighbors; }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!tooClose) {
+                                addPoint({ x: nx, y: ny });
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!found) active.splice(randIdx, 1);
+                    if (seeds.length > 50000) break; // Hard safety cap
+                }
+            } else if (mode === 'random') {
+                const count = Math.ceil((width * height) / (seedSpacing * seedSpacing));
+                for (let i = 0; i < count; i++) {
+                    seeds.push({ x: Math.random() * width, y: Math.random() * height });
+                }
+            } else {
+                // Grid seeding
+                for (let sy = 0; sy < height; sy += seedSpacing) {
+                    const xOffset = (Math.floor(sy / seedSpacing) % 2) * (seedSpacing / 2);
+                    for (let sx = xOffset; sx < width; sx += seedSpacing) {
+                        seeds.push({ x: sx, y: sy });
+                    }
+                }
+                // Shuffle seeds loosely
+                for (let i = seeds.length - 1; i > 0; i--) {
+                    const j = Math.abs(Math.sin(i)) * seeds.length | 0;
+                    [seeds[i], seeds[j % seeds.length]] = [seeds[j % seeds.length], seeds[i]];
+                }
             }
 
             let lineIdCounter = 1;
@@ -345,7 +436,6 @@ export class ImageNormalTracing {
                 const lineId = (lineIdCounter++ % 32767);
                 const currentLineCells = new Set<number>();
 
-                // Reserve start cell
                 if (sc >= 0) { spatialGrid[sc] = lineId; currentLineCells.add(sc); }
 
                 const forward = trace(s.x, s.y, 1, lineId, currentLineCells);
@@ -356,7 +446,7 @@ export class ImageNormalTracing {
                     model.models![`hatch_${lineIdCounter}`] = new MakerJs.models.ConnectTheDots(false, pts);
                     for (const pt of pts) {
                         const mid = getCell(pt[0], pt[1]);
-                        if (mid >= 0) spatialGrid[mid] = 1; // Mark permanent
+                        if (mid >= 0) spatialGrid[mid] = 1;
                     }
                 }
             }

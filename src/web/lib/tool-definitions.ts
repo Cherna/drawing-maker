@@ -223,6 +223,8 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'flipX', label: 'Flip X', type: 'boolean', default: false },
       { key: 'flipY', label: 'Flip Y', type: 'boolean', default: false },
       { key: 'densityCurve', label: 'Density Curve', type: 'number', min: 0.1, max: 3, step: 0.1, default: 1 },
+      { key: 'flowSmoothing', label: 'Flow Smoothing', type: 'number', min: 0, max: 20, step: 0.5, default: 0 },
+      { key: 'seedingMode', label: 'Seeding Mode', type: 'select', options: ['grid', 'random', 'blue-noise'], default: 'grid' },
       { key: 'drawContour', label: 'Draw Contour', type: 'boolean', default: false },
       { key: 'contourThreshold', label: 'Contour Threshold', type: 'number', min: 0, max: 1, step: 0.05, default: 0.5 },
       { key: 'blur', label: 'Blur (Fuzziness)', type: 'number', min: 0, max: 20, step: 0.5, default: 0 },
