@@ -43,7 +43,11 @@ export default function LayerStepItem({
     // Set defaults for new tool
     if (newToolDef) {
       newToolDef.params.forEach((param) => {
-        if (param.default !== undefined) {
+        // If the new tool has a parameter with the same name as the old tool,
+        // preserve the value if it's not empty/default.
+        if (step.params[param.key] !== undefined) {
+          newParams[param.key] = step.params[param.key];
+        } else if (param.default !== undefined) {
           newParams[param.key] = param.default;
         }
       });
@@ -146,7 +150,7 @@ export default function LayerStepItem({
         </div>
 
         {isExpanded && (
-          <div className="space-y-3 pt-2 border-t border-border">
+          <div className="space-y-3 pt-2 border-t border-border" key={step.tool}>
             <StepParams
               step={step}
               index={index}
