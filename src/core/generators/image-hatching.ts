@@ -481,24 +481,47 @@ export class ImageHatching {
 
                         const calculateDraw = (d: number): boolean => {
                             if (!alphaOk || d >= threshold) return false;
-                            const darkness = 1.0 - d;
-                            let normalizedDarkness = Math.max(0, darkness - (1.0 - threshold)) / threshold;
-                            normalizedDarkness = Math.min(1.0, Math.pow(normalizedDarkness, densityCurve));
-                            const bucketIndex = Math.floor(normalizedDarkness * (steps - 0.001));
+
+                            // 1. Calculate darkness (0 = light/threshold, 1 = black)
+                            const darkness = Math.max(0, (threshold - d) / threshold);
+
+                            // 2. Apply the user's density curve exponent
+                            // densityCurve < 1 broadens the dark range (more detail in darks)
+                            // densityCurve > 1 squashes the dark range (more detail in lights)
+                            const mappedDarkness = Math.min(1.0, Math.pow(darkness, densityCurve));
+
+                            // 3. Convert mapped darkness directly to an interval multiplier.
+                            // The darkest areas (mapping near 1) get interval = 1 (every minSpacing line)
+                            // The lightest areas (mapping near 0) get interval = MaxSteps^2 (e.g. 1, 2, 4, 8, 16)
+                            // We use continuous math instead of discrete buckets for smoother gradients.
+
+                            // Max spacing interval multiplier (how far apart lines can get in bright areas)
+                            const maxInterval = Math.pow(2, steps - 1);
+
+                            // Exponential spacing curve: interval = maxInterval * (factor ^ -mappedDarkness)
+                            // When mappedDarkness = 1, interval = 1.
+                            // When mappedDarkness = 0, interval = maxInterval.
+                            let interval = maxInterval * Math.pow(1 / maxInterval, mappedDarkness);
+
+                            // Add a tiny epsilon to ensure round() behaves predictably on boundaries
+                            interval = Math.max(1, interval + 0.0001);
 
                             let isSwitched = false;
                             const chance = options.crossHatchChance || 0;
                             if (chance > 0) {
-                                if (chance >= 1.0) { isSwitched = (bucketIndex % 2 === 1); }
-                                else { const h = Math.sin((bucketIndex + 1) * 123.456) * 10000; isSwitched = (h - Math.floor(h)) < chance; }
+                                // For cross-hatching noise, we use the line index instead of the bucket
+                                if (chance >= 1.0) { isSwitched = (lineIndex % 2 === 1); }
+                                else { const h = Math.sin((lineIndex + 1) * 123.456) * 10000; isSwitched = (h - Math.floor(h)) < chance; }
                             }
 
                             const isAltPass = Math.abs(angleOffset) > 0.01;
                             const shouldDrawPass = options.crossHatch ? true : (isAltPass ? isSwitched : !isSwitched);
 
                             if (shouldDrawPass) {
-                                const spacing = 1 << Math.max(0, Math.min(4, steps - 1 - bucketIndex));
-                                if (lineIndex % spacing === 0) return true;
+                                // Draw if the current line index modulo the calculated interval is very close to 0.
+                                // We use rounded continuous math.
+                                const roundedInterval = Math.max(1, Math.round(interval));
+                                if (lineIndex % roundedInterval === 0) return true;
                             }
                             return false;
                         };

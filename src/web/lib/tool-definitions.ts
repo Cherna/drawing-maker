@@ -477,6 +477,13 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'tolerance', label: 'Tolerance (mm)', type: 'number', min: 0.01, max: 10, step: 0.01, default: 0.3 },
     ],
   },
+  'cleanup': {
+    category: 'modifier',
+    label: 'Cleanup',
+    params: [
+      { key: 'minLength', label: 'Min Length (mm)', type: 'number', min: 0.1, max: 20, step: 0.1, default: 1.0 },
+    ],
+  },
   'duplicate': {
     category: 'modifier',
     label: 'Duplicate',

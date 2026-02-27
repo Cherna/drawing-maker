@@ -271,6 +271,10 @@ const MODIFIERS: Record<string, ModifierFn> = {
         Effects.simplify(model, params.tolerance ?? 0.5);
     },
 
+    'cleanup': (model, params) => {
+        Effects.cleanup(model, params.minLength ?? 1.0);
+    },
+
     'glitch1': (model, params) => {
         const iterations = params.iterations ?? 1;
         const factor = params.factor ?? 0.5;

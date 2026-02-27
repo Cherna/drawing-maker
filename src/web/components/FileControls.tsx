@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfigStore } from '../store/config-store';
 import { Button } from './ui/button';
-// DropdownMenu imports removed
 import { Save, FolderOpen, FilePlus, RefreshCw, Trash2 } from 'lucide-react';
 import { SketchMetadata } from '../../types';
-
 import { SketchBrowser } from './SketchBrowser';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function FileControls() {
     const { config, setConfig, isDirty, markClean } = useConfigStore();
@@ -16,7 +16,7 @@ export default function FileControls() {
 
     const refreshSketches = useCallback(async () => {
         try {
-            const res = await fetch('http://localhost:3000/api/sketches');
+            const res = await fetch(`${API_BASE}/api/sketches`);
             const data = await res.json();
             setSketches(data.files || []);
         } catch (e) {
@@ -46,7 +46,7 @@ export default function FileControls() {
                 outputBaseName: cleanName
             };
 
-            const res = await fetch('http://localhost:3000/api/save', {
+            const res = await fetch(`${API_BASE}/api/save`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: cleanName, config: updatedConfig, overwrite }),
@@ -99,7 +99,7 @@ export default function FileControls() {
 
         setIsLoading(true);
         try {
-            const res = await fetch(`http://localhost:3000/api/sketches/${activeFile}.json`, {
+            const res = await fetch(`${API_BASE}/api/sketches/${activeFile}.json`, {
                 method: 'DELETE'
             });
 
@@ -124,7 +124,7 @@ export default function FileControls() {
 
         setIsLoading(true);
         try {
-            const res = await fetch(`http://localhost:3000/api/sketches/${filename}`);
+            const res = await fetch(`${API_BASE}/api/sketches/${filename}`);
             if (!res.ok) throw new Error('Sketch not found');
             const newConfig = await res.json();
             setConfig(newConfig);
@@ -192,7 +192,7 @@ export default function FileControls() {
                                     if (saved) {
                                         setIsLoading(true);
                                         try {
-                                            await fetch(`http://localhost:3000/api/sketches/${activeFile}.json`, {
+                                            await fetch(`${API_BASE}/api/sketches/${activeFile}.json`, {
                                                 method: 'DELETE'
                                             });
                                             refreshSketches();
@@ -241,7 +241,7 @@ export default function FileControls() {
                     onDelete={async (filename) => {
                         setIsLoading(true);
                         try {
-                            const res = await fetch(`http://localhost:3000/api/sketches/${filename}`, {
+                            const res = await fetch(`${API_BASE}/api/sketches/${filename}`, {
                                 method: 'DELETE'
                             });
 
@@ -283,7 +283,7 @@ export default function FileControls() {
                 onClick={async () => {
                     setIsLoading(true);
                     try {
-                        const res = await fetch('http://localhost:3000/api/export-animated', {
+                        const res = await fetch(`${API_BASE}/api/export-animated`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(config),

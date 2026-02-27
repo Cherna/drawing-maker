@@ -7,6 +7,8 @@ import { cn } from '../lib/utils';
 
 import { SketchMetadata } from '../../types';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 interface SketchBrowserProps {
     isOpen: boolean;
     onClose: () => void;
@@ -60,7 +62,7 @@ export function SketchBrowser({
     const handleRegenerateThumbnails = async () => {
         setIsRegenerating(true);
         try {
-            const res = await fetch('http://localhost:3000/api/regenerate-thumbnails', {
+            const res = await fetch(`${API_BASE}/api/regenerate-thumbnails`, {
                 method: 'POST'
             });
             const data = await res.json();
@@ -149,7 +151,7 @@ export function SketchBrowser({
                             {filteredSketches.map((sketch) => {
                                 const isSelected = selectedSketch === sketch.filename;
                                 const isActive = activeSketch === sketch.filename.replace('.json', '');
-                                const thumbnailSrc = `http://localhost:3000/api/thumbnails/${sketch.filename.replace('.json', '.png')}?t=${refreshTrigger}`;
+                                const thumbnailSrc = `${API_BASE}/api/thumbnails/${sketch.filename.replace('.json', '.png')}?t=${refreshTrigger}`;
 
                                 return (
                                     <div
