@@ -505,13 +505,19 @@ export class ImageHatching {
 
                             // Add a tiny epsilon to ensure round() behaves predictably on boundaries
                             interval = Math.max(1, interval + 0.0001);
+                            const roundedInterval = Math.max(1, Math.round(interval));
 
                             let isSwitched = false;
                             const chance = options.crossHatchChance || 0;
                             if (chance > 0) {
-                                // For cross-hatching noise, we use the line index instead of the bucket
-                                if (chance >= 1.0) { isSwitched = (lineIndex % 2 === 1); }
-                                else { const h = Math.sin((lineIndex + 1) * 123.456) * 10000; isSwitched = (h - Math.floor(h)) < chance; }
+                                // For cross-hatching noise, we want regions of the same density to potentially switch
+                                // so we use the rounded interval (which correlates to the darkness) to hash it.
+                                // If chance is 1, we just switch every other density tier.
+                                if (chance >= 1.0) { isSwitched = (roundedInterval % 2 === 1); }
+                                else {
+                                    const h = Math.sin((roundedInterval + 1) * 123.456) * 10000;
+                                    isSwitched = (h - Math.floor(h)) < chance;
+                                }
                             }
 
                             const isAltPass = Math.abs(angleOffset) > 0.01;
@@ -520,7 +526,6 @@ export class ImageHatching {
                             if (shouldDrawPass) {
                                 // Draw if the current line index modulo the calculated interval is very close to 0.
                                 // We use rounded continuous math.
-                                const roundedInterval = Math.max(1, Math.round(interval));
                                 if (lineIndex % roundedInterval === 0) return true;
                             }
                             return false;
