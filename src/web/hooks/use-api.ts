@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { AppConfig } from '../../types';
 
 // Use relative URLs so Vite's proxy works from any network location
-// Vite proxies /api/* to http://localhost:3000/api/*
+// Vite proxies /api/* to http://localhost:3333/api/*
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export function usePreview(config: AppConfig) {

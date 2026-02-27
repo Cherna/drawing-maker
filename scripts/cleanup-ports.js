@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Cleanup script to kill processes using ports 3000 (API) and 5173 (Vite)
+ * Cleanup script to kill processes using ports 3333 (API) and 5173 (Vite)
  * Works on Windows
  */
 
 const { execSync } = require('child_process');
 
-const PORTS = [3000, 5173];
+const PORTS = [3333, 5173];
 
 console.log('🧹 Cleaning up development server ports...\n');
 

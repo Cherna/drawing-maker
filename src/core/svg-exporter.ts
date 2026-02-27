@@ -10,6 +10,7 @@ function processPathToLines(
     canvasHeight: number,
     lines: string[]
 ) {
+    if (!path) return;
     if (path.type === 'line') {
         const line = path as MakerJs.IPathLine;
         const x1 = (line.origin[0] + offsetX).toFixed(3);
@@ -157,7 +158,7 @@ export function modelToSVG(model: MakerJs.IModel, canvas: CanvasConfig): string 
   <g stroke="#000" stroke-width="0.25" fill="none" stroke-linecap="round">
     ${normal.join('\n    ')}
   </g>
-  <g stroke="#888" stroke-width="0.08" fill="none" stroke-linecap="round">
+  <g stroke="#000" stroke-width="0.25" fill="none" stroke-linecap="round">
     ${hatch.join('\n    ')}
   </g>
 </svg>`;
@@ -179,7 +180,6 @@ export function modelToSVGWithColor(
     const { normal, hatch, filled, rasters } = walkAllPaths(model, canvas.height, processPathToLines);
     const opacityAttr = opacity < 1.0 ? ` stroke-opacity="${opacity.toFixed(2)}"` : '';
     const fillOpacityAttr = opacity < 1.0 ? ` opacity="${opacity.toFixed(2)}"` : '';
-    const hatchStrokeWidth = Math.max(0.05, strokeWidth * 0.3);
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
      width="${canvas.width}mm" 
@@ -195,7 +195,7 @@ export function modelToSVGWithColor(
   <g stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
     ${normal.join('\n    ')}
   </g>
-  <g stroke="#888" stroke-width="${hatchStrokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
+  <g stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
     ${hatch.join('\n    ')}
   </g>
 </svg>`;
@@ -224,7 +224,6 @@ export function layersToSVG(
         const { normal, hatch, filled, rasters } = walkAllPaths(model, canvasHeight, processPathToLines);
         const opacityAttr = opacity < 1.0 ? ` stroke-opacity="${opacity.toFixed(2)}"` : '';
         const fillOpacityAttr = opacity < 1.0 ? ` opacity="${opacity.toFixed(2)}"` : '';
-        const hatchStrokeWidth = Math.max(0.05, strokeWidth * 0.3);
 
         layerGroups.push(`  <g id="${layerId}_rasters">
 ${rasters.join('\n')}
@@ -235,7 +234,7 @@ ${filled.join('\n')}
   <g id="${layerId}" stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
 ${normal.join('\n')}
   </g>
-  <g id="${layerId}_hatch" stroke="#888" stroke-width="${hatchStrokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
+  <g id="${layerId}_hatch" stroke="${color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="round"${opacityAttr}>
 ${hatch.join('\n')}
   </g>`);
 
