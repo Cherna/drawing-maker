@@ -18,7 +18,8 @@ export class ImageHatchingParams {
     flipY?: boolean;
     densityCurve?: number;   // gamma exponent for the period curve (1=linear, <1=more dense darks, >1=sparser)
     drawContour?: boolean;   // trace the boundary of dark regions as a line
-    contourThreshold?: number; // brightness cutoff for contour detection (default = same as threshold)
+    contourThreshold?: number; // brightness cutoff that defines where the contour is (default = same as threshold)
+    contourBrightnessThreshold?: number; // only draw contour segments where local brightness is below this value
     blur?: number;
     minAlpha?: number;
     maxAlpha?: number;
@@ -839,8 +840,16 @@ export class ImageHatching {
                 strands.push(strand);
             }
 
+            const brightnessLimit = options.contourBrightnessThreshold ?? 1.0;
+
             for (const strand of strands) {
                 if (strand.length >= 2) {
+                    // Filter by brightness at strand midpoint if a limit is set
+                    if (brightnessLimit < 1.0) {
+                        const mid = strand[Math.floor(strand.length / 2)];
+                        const brightness = getDensity(mid[0], mid[1]);
+                        if (brightness > brightnessLimit) continue;
+                    }
                     model.models![`fill_contour_${contourId++}`] =
                         new MakerJs.models.ConnectTheDots(false, strand);
                 }

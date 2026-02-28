@@ -20,6 +20,7 @@ export class ConcentricHatchingParams {
     showShading?: boolean;
     drawContour?: boolean;
     contourThreshold?: number;
+    contourBrightnessThreshold?: number;
     simplifyContour?: boolean;
     simplifyTolerance?: number;
     densityCurve?: number;
@@ -381,6 +382,9 @@ export class ConcentricHatching {
             if (options.drawContour) {
                 const contourModel: MakerJs.IModel = { paths: {}, models: {} };
                 const contourThresholdInt = Math.floor((options.contourThreshold ?? 0.5) * 255);
+                const contourBrightnessInt = options.contourBrightnessThreshold != null
+                    ? Math.floor(options.contourBrightnessThreshold * 255)
+                    : null;
 
                 const contourEdt = computeEDT(dWidth, dHeight, (x, y) => {
                     const idx = (y * dWidth + x) * 4;
@@ -395,6 +399,17 @@ export class ConcentricHatching {
                 const cSegs = marchingSquaresMulti(contourEdt, dWidth, dHeight, 2, 2);
                 let cId = 0;
                 for (const seg of cSegs) {
+                    // Optionally filter segments by local brightness at their midpoint
+                    if (contourBrightnessInt !== null) {
+                        const midX = Math.floor((seg.x1 + seg.x2) / 2);
+                        const midY = Math.floor((seg.y1 + seg.y2) / 2);
+                        if (midX >= 0 && midX < dWidth && midY >= 0 && midY < dHeight) {
+                            const idx = (midY * dWidth + midX) * 4;
+                            if (image.bitmap.data[idx + 3] < 128) continue; // transparent, skip
+                            const brightness = image.bitmap.data[idx];
+                            if (brightness > contourBrightnessInt) continue; // too bright, skip
+                        }
+                    }
                     const mapX1 = startX + seg.x1 * scale;
                     const mapY1 = height - (startY + seg.y1 * scale);
                     const mapX2 = startX + seg.x2 * scale;

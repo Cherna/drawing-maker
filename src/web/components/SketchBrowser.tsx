@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -33,6 +33,19 @@ export function SketchBrowser({
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(Date.now());
     const [gridCols, setGridCols] = useState(4);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Autofocus search input when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setSearchQuery('');
+            // Small timeout to ensure the dialog is fully mounted and focus-trapped
+            const timer = setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
 
     const filteredSketches = useMemo(() => {
         if (!searchQuery) return sketches;
@@ -127,6 +140,7 @@ export function SketchBrowser({
                     <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
+                            ref={inputRef}
                             placeholder="Search sketches..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
