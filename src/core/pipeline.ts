@@ -10,9 +10,10 @@ import { GCodeConfig } from '../types';
 import { ImageHatching } from './generators/image-hatching';
 import { ImageNormalTracing } from './generators/image-normal-tracing';
 import { ExperimentalHatching } from './generators/experimental-hatching';
+import { ConcentricHatching } from './generators/concentric-hatching';
 
-type GeneratorFn = (params: any, ctx: CanvasConfig, bounds: Box) => MakerJs.IModel | Promise<MakerJs.IModel>;
-type ModifierFn = (model: MakerJs.IModel, params: any, ctx: CanvasConfig, bounds: Box, mask?: (x: number, y: number) => number) => Promise<MakerJs.IModel | void> | MakerJs.IModel | void;
+type GeneratorFn = (params: any, ctx: CanvasConfig, bounds: Box, options?: { signal?: AbortSignal }) => MakerJs.IModel | Promise<MakerJs.IModel>;
+type ModifierFn = (model: MakerJs.IModel, params: any, ctx: CanvasConfig, bounds: Box, mask?: (x: number, y: number) => number, options?: { signal?: AbortSignal }) => Promise<MakerJs.IModel | void> | MakerJs.IModel | void;
 
 /**
  * Deep clone a MakerJs model, ensuring all paths and models are truly independent.
@@ -217,16 +218,20 @@ const GENERATORS: Record<string, GeneratorFn> = {
         });
     },
 
-    'image-hatching': async (params, ctx, bounds) => {
-        return ImageHatching.generate(ctx, params);
+    'image-hatching': async (params, ctx, bounds, options) => {
+        return ImageHatching.generate(ctx, { ...params, ...options });
     },
 
-    'image-normal-tracing': async (params, ctx, bounds) => {
-        return ImageNormalTracing.generate(ctx, params);
+    'image-normal-tracing': async (params, ctx, bounds, options) => {
+        return ImageNormalTracing.generate(ctx, { ...params, ...options });
     },
 
-    'experimental-hatching': async (params, ctx, bounds) => {
-        return ExperimentalHatching.generate(ctx, params);
+    'concentric-hatching': async (params, ctx, bounds, options) => {
+        return ConcentricHatching.generate(ctx, { ...params, ...options });
+    },
+
+    'experimental-hatching': async (params, ctx, bounds, options) => {
+        return ExperimentalHatching.generate(ctx, { ...params, ...options });
     }
 };
 
@@ -521,7 +526,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
      * Creates a duplicate of the drawing up to this point, applies the nested steps to the duplicate,
      * then merges it back with the original.
      */
-    'duplicate': async (model, params, ctx, bounds) => {
+    'duplicate': async (model, params, ctx, bounds, maskFn, options) => {
         // Create a deep copy of the current model (snapshot) - this is completely independent
         let duplicate = deepCloneModel(model);
         const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
@@ -554,7 +559,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
                     }
 
                     // Apply modifier to duplicate (works on the isolated copy)
-                    const result = await MODIFIERS[step.tool](duplicate, step.params || {}, ctx, localBounds, maskFn);
+                    const result = await MODIFIERS[step.tool](duplicate, step.params || {}, ctx, localBounds, maskFn, { signal: options?.signal });
 
                     // If modifier returned a new model, use it and ensure it's isolated
                     if (result) {
@@ -672,7 +677,7 @@ const MODIFIERS: Record<string, ModifierFn> = {
 
 // ==================== PIPELINE EXECUTOR ====================
 export class Pipeline {
-    static async execute(steps: PipelineStep[], ctx: CanvasConfig, globalSeed?: number, gcode?: GCodeConfig): Promise<MakerJs.IModel> {
+    static async execute(steps: PipelineStep[], ctx: CanvasConfig, globalSeed?: number, gcode?: GCodeConfig, options?: { signal?: AbortSignal }): Promise<MakerJs.IModel> {
         let currentModel: MakerJs.IModel | null = null;
         const bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
         const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
@@ -691,7 +696,7 @@ export class Pipeline {
 
             // 1. Generator
             if (GENERATORS[step.tool]) {
-                const model = await GENERATORS[step.tool](stepParams, ctx, localBounds);
+                const model = await GENERATORS[step.tool](stepParams, ctx, localBounds, { signal: options?.signal });
 
                 if (currentModel) {
                     // Combine models by adding the new one as a unique sub-model.
@@ -805,7 +810,7 @@ export class Pipeline {
      * @param globalSeed Optional global seed for reproducibility
      * @returns Map of layer IDs to their processed models
      */
-    static async executeLayered(layers: Layer[], ctx: CanvasConfig, globalSeed?: number, gcode?: GCodeConfig): Promise<Map<string, MakerJs.IModel>> {
+    static async executeLayered(layers: Layer[], ctx: CanvasConfig, globalSeed?: number, gcode?: GCodeConfig, options?: { signal?: AbortSignal }): Promise<Map<string, MakerJs.IModel>> {
         const result = new Map<string, MakerJs.IModel>();
         const bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
         const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
@@ -837,7 +842,7 @@ export class Pipeline {
 
                 // 1. Generator
                 if (GENERATORS[step.tool]) {
-                    const model = await GENERATORS[step.tool](stepParams, ctx, localBounds);
+                    const model = await GENERATORS[step.tool](stepParams, ctx, localBounds, { signal: options?.signal });
 
                     if (currentModel) {
                         // Combine with existing model
@@ -871,7 +876,7 @@ export class Pipeline {
                     }
 
                     const maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
-                    const modifierResult = await MODIFIERS[step.tool](currentModel, stepParams, ctx, localBounds, maskFn);
+                    const modifierResult = await MODIFIERS[step.tool](currentModel, stepParams, ctx, localBounds, maskFn, { signal: options?.signal });
 
                     if (modifierResult) {
                         currentModel = modifierResult;
@@ -925,7 +930,7 @@ export class Pipeline {
      * Apply a pipeline of steps to an existing model.
      * Useful for global modifiers.
      */
-    static async executeOnModel(model: MakerJs.IModel, steps: PipelineStep[], ctx: CanvasConfig, globalSeed?: number): Promise<MakerJs.IModel> {
+    static async executeOnModel(model: MakerJs.IModel, steps: PipelineStep[], ctx: CanvasConfig, globalSeed?: number, options?: { signal?: AbortSignal }): Promise<MakerJs.IModel> {
         let currentModel = model;
         const bounds = Layout.getDrawArea(ctx.width, ctx.height, ctx.margin);
         const localBounds = { x: 0, y: 0, width: bounds.width, height: bounds.height };
@@ -936,7 +941,7 @@ export class Pipeline {
             if (MODIFIERS[step.tool]) {
                 const stepSeed = step.params?.seed ?? globalSeed;
                 const maskFn = step.mask ? Masks.create(step.mask, localBounds, stepSeed) : undefined;
-                const result = await MODIFIERS[step.tool](currentModel, step.params || {}, ctx, bounds, maskFn);
+                const result = await MODIFIERS[step.tool](currentModel, step.params || {}, ctx, bounds, maskFn, { signal: options?.signal });
 
                 if (result) {
                     currentModel = result;

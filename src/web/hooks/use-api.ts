@@ -9,11 +9,12 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 export function usePreview(config: AppConfig) {
   return useQuery({
     queryKey: ['preview', config],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const response = await fetch(`${API_BASE}/api/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
+        signal,
       });
       if (!response.ok) {
         const error = await response.json();

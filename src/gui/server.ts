@@ -67,6 +67,13 @@ function createPreviewConfig(config: AppConfig): AppConfig {
 // API: Generate preview (lightweight)
 
 app.post('/api/preview', async (req, res) => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    req.on('close', () => {
+        controller.abort();
+    });
+
     try {
         const config: AppConfig = req.body;
         const previewConfig = createPreviewConfig(config);
@@ -76,7 +83,7 @@ app.post('/api/preview', async (req, res) => {
 
         if (layers && layers.length > 0) {
             // New layer-aware rendering
-            const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode);
+            const layerModels = await Pipeline.executeLayered(layers, previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode, { signal });
 
             // Build layer data for rendering
             const layerData = new Map<string, { model: MakerJs.IModel, color: string, opacity?: number, strokeWidth?: number }>();
@@ -100,7 +107,7 @@ app.post('/api/preview', async (req, res) => {
 
             // Apply global modifiers if present
             if (previewConfig.params.globalSteps && previewConfig.params.globalSteps.length > 0) {
-                finalModel = await Pipeline.executeOnModel(finalModel, previewConfig.params.globalSteps, previewConfig.canvas, previewConfig.params.seed);
+                finalModel = await Pipeline.executeOnModel(finalModel, previewConfig.params.globalSteps, previewConfig.canvas, previewConfig.params.seed, { signal });
 
                 // Update layerData with modified models so they appear in the SVG
                 if (finalModel.models) {
@@ -120,12 +127,15 @@ app.post('/api/preview', async (req, res) => {
             res.json({ svg, stats });
         } else {
             // Backward compatibility: use old pipeline for non-layered configs
-            const model = await Pipeline.execute(previewConfig.params.steps || [], previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode);
+            const model = await Pipeline.execute(previewConfig.params.steps || [], previewConfig.canvas, previewConfig.params.seed, previewConfig.gcode, { signal });
             const svg = modelToSVG(model, previewConfig.canvas);
             const stats = computeGCodeStats(model, previewConfig);
             res.json({ svg, stats });
         }
     } catch (error: any) {
+        if (signal.aborted) {
+            return res.status(499).json({ error: 'Request cancelled' });
+        }
         console.error('Preview error:', error);
         console.error('Stack trace:', error.stack);
         res.status(500).json({ error: error.message });

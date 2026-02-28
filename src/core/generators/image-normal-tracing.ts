@@ -1,5 +1,6 @@
 import MakerJs from 'makerjs';
 import sharp from 'sharp';
+import { Jimp } from 'jimp';
 import { CanvasConfig } from '../../types';
 
 export class ImageNormalTracingParams {
@@ -22,6 +23,9 @@ export class ImageNormalTracingParams {
     maxAlpha?: number;
     flowSmoothing?: number;
     seedingMode?: 'grid' | 'random' | 'blue-noise';
+    preFilter?: boolean;
+    preBrightness?: number;
+    preContrast?: number;
 }
 
 export class ImageNormalTracing {
@@ -37,7 +41,19 @@ export class ImageNormalTracing {
         }
 
         const base64Data = options.densityMap.replace(/^data:image\/[^;]+;base64,/, "");
-        const imageBuffer = Buffer.from(base64Data, 'base64');
+        let imageBuffer = Buffer.from(base64Data, 'base64');
+
+        if (options.preFilter) {
+            const jimpImg = await Jimp.read(imageBuffer);
+            if (options.preBrightness && options.preBrightness !== 1) {
+                jimpImg.brightness(options.preBrightness - 1);
+            }
+            if (options.preContrast && options.preContrast !== 0) {
+                jimpImg.contrast(options.preContrast);
+            }
+            const b64 = await jimpImg.getBase64('image/png');
+            imageBuffer = Buffer.from(b64.replace(/^data:image\/png;base64,/, ""), 'base64');
+        }
 
         let densitySharp = sharp(imageBuffer);
         if (options.blur && options.blur > 0) {

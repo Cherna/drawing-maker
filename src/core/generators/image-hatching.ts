@@ -1,5 +1,6 @@
 ﻿import MakerJs from 'makerjs';
 import sharp from 'sharp';
+import { Jimp } from 'jimp';
 import { CanvasConfig } from '../../types';
 export class ImageHatchingParams {
     densityMap?: string;
@@ -21,6 +22,9 @@ export class ImageHatchingParams {
     blur?: number;
     minAlpha?: number;
     maxAlpha?: number;
+    preFilter?: boolean;
+    preBrightness?: number;
+    preContrast?: number;
 }
 
 export class ImageHatching {
@@ -36,7 +40,20 @@ export class ImageHatching {
         }
 
         const base64Data = options.densityMap.replace(/^data:image\/[^;]+;base64,/, "");
-        const imageBuffer = Buffer.from(base64Data, 'base64');
+        let imageBuffer = Buffer.from(base64Data, 'base64');
+
+        if (options.preFilter) {
+            const jimpImg = await Jimp.read(imageBuffer);
+            if (options.preBrightness && options.preBrightness !== 1) {
+                jimpImg.brightness(options.preBrightness - 1);
+            }
+            if (options.preContrast && options.preContrast !== 0) {
+                jimpImg.contrast(options.preContrast);
+            }
+            const b64 = await jimpImg.getBase64('image/png');
+            imageBuffer = Buffer.from(b64.replace(/^data:image\/png;base64,/, ""), 'base64');
+        }
+
         // Do NOT call .grayscale() here — it strips the alpha channel before ensureAlpha()
         // can preserve it, causing transparent pixels to become opaque black.
         // Grayscale is computed manually via the luma formula in getDensity().
