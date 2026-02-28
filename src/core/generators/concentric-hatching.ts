@@ -23,6 +23,7 @@ export class ConcentricHatchingParams {
     simplifyContour?: boolean;
     simplifyTolerance?: number;
     densityCurve?: number;
+    minSegmentLength?: number;
     preFilter?: boolean;
     preBrightness?: number;
     preContrast?: number;
@@ -156,6 +157,10 @@ function marchingSquaresMulti(
                 for (const edgeObj of edges[state]) {
                     const pt1 = pts[edgeObj[0]];
                     const pt2 = pts[edgeObj[1]];
+                    const dx = pt2.x - pt1.x;
+                    const dy = pt2.y - pt1.y;
+                    // Skip degenerate near-zero-length segments (appear as dots in output)
+                    if (dx * dx + dy * dy < 1e-6) continue;
                     segments.push({
                         x1: pt1.x, y1: pt1.y,
                         x2: pt2.x, y2: pt2.y,
@@ -332,12 +337,43 @@ export class ConcentricHatching {
                 );
             }
 
+            // Pre-simplify: remove isolated short segments (the dots near contour boundaries).
+            // An isolated segment has BOTH endpoints shared by no other segment (degree 1 on both ends).
+            // Ring contour segments always share an endpoint with a neighbor, so they are never removed.
+            // Filtering BEFORE simplify avoids the false-positive where curved rings get simplified
+            // into short straight Lines with a small origin→end distance.
+            const minPathLengthMm = options.minSegmentLength ?? 0;
+            if (minPathLengthMm > 0 && isolinesModel.paths) {
+                const ptKey = (x: number, y: number) =>
+                    `${Math.round(x * 1e4)},${Math.round(y * 1e4)}`;
+                const degree = new Map<string, number>();
+                for (const key of Object.keys(isolinesModel.paths)) {
+                    const p = isolinesModel.paths[key] as MakerJs.IPathLine;
+                    if (p.type !== 'line') continue;
+                    const ok = ptKey(p.origin[0], p.origin[1]);
+                    const ek = ptKey(p.end[0], p.end[1]);
+                    degree.set(ok, (degree.get(ok) ?? 0) + 1);
+                    degree.set(ek, (degree.get(ek) ?? 0) + 1);
+                }
+                for (const key of Object.keys(isolinesModel.paths)) {
+                    const p = isolinesModel.paths[key] as MakerJs.IPathLine;
+                    if (p.type !== 'line') continue;
+                    const ok = ptKey(p.origin[0], p.origin[1]);
+                    const ek = ptKey(p.end[0], p.end[1]);
+                    if ((degree.get(ok) ?? 0) === 1 && (degree.get(ek) ?? 0) === 1) {
+                        const dx = p.end[0] - p.origin[0];
+                        const dy = p.end[1] - p.origin[1];
+                        if (Math.sqrt(dx * dx + dy * dy) < minPathLengthMm) {
+                            delete isolinesModel.paths[key];
+                        }
+                    }
+                }
+            }
+
             // GCODE OPTIMIZATION:
             // Native marching squares outputs thousands of microscopic line segments, causing intense travel chatter. 
             // Running a low-tolerance simplification forces MakerJS RDP algorithm to search, merge, and chain them seamlessly into unified strokes.
-            console.log("Before simplify, path count:", Object.keys(isolinesModel.paths || {}).length);
             Effects.simplify(isolinesModel, 0.1);
-            console.log("After simplify, path count:", Object.keys(isolinesModel.paths || {}).length);
 
             model.models!['isolines'] = isolinesModel;
 

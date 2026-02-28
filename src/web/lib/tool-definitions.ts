@@ -263,6 +263,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       { key: 'simplifyContour', label: 'Simplify Contour', type: 'boolean', default: false },
       { key: 'simplifyTolerance', label: 'Simplify Tolerance (mm)', type: 'number', min: 0.01, max: 10, step: 0.01, default: 0.3 },
       { key: 'densityCurve', label: 'Density Curve', type: 'number', min: 0.1, max: 5, step: 0.1, default: 1.0 },
+      { key: 'minSegmentLength', label: 'Min Path Length (mm)', type: 'number', min: 0, max: 5, step: 0.1, default: 0 },
     ],
   },
   'experimental-hatching': {
