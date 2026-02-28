@@ -70,8 +70,10 @@ app.post('/api/preview', async (req, res) => {
     const controller = new AbortController();
     const { signal } = controller;
 
-    req.on('close', () => {
-        controller.abort();
+    res.on('close', () => {
+        if (!res.writableEnded) {
+            controller.abort();
+        }
     });
 
     try {

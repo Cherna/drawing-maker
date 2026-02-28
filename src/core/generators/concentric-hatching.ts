@@ -335,7 +335,9 @@ export class ConcentricHatching {
             // GCODE OPTIMIZATION:
             // Native marching squares outputs thousands of microscopic line segments, causing intense travel chatter. 
             // Running a low-tolerance simplification forces MakerJS RDP algorithm to search, merge, and chain them seamlessly into unified strokes.
+            console.log("Before simplify, path count:", Object.keys(isolinesModel.paths || {}).length);
             Effects.simplify(isolinesModel, 0.1);
+            console.log("After simplify, path count:", Object.keys(isolinesModel.paths || {}).length);
 
             model.models!['isolines'] = isolinesModel;
 
